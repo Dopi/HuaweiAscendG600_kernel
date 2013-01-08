@@ -13,6 +13,7 @@
 
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
+#include <asm/io.h>
 #include <linux/ion.h>
 #include <mach/msm_iomap.h>
 #include <mach/irqs-8930.h>
@@ -24,10 +25,12 @@
 #include <mach/socinfo.h>
 #include <mach/iommu_domains.h>
 #include <mach/msm_rtb.h>
+#include <mach/msm_cache_dump.h>
 
 #include "devices.h"
 #include "rpm_log.h"
 #include "rpm_stats.h"
+#include "rpm_rbcpr_stats.h"
 #include "footswitch.h"
 
 #ifdef CONFIG_MSM_MPM
@@ -126,7 +129,6 @@ struct msm_rpm_platform_data msm8930_rpm_data __initdata = {
 		MSM_RPM_MAP(8930, CXO_BUFFERS, CXO_BUFFERS, 1),
 		MSM_RPM_MAP(8930, USB_OTG_SWITCH, USB_OTG_SWITCH, 1),
 		MSM_RPM_MAP(8930, HDMI_SWITCH, HDMI_SWITCH, 1),
-		MSM_RPM_MAP(8930, DDR_DMM_0, DDR_DMM, 2),
 		MSM_RPM_MAP(8930, QDSS_CLK, QDSS_CLK, 1),
 		MSM_RPM_MAP(8930, VOLTAGE_CORNER, VOLTAGE_CORNER, 1),
 	},
@@ -231,8 +233,6 @@ struct msm_rpm_platform_data msm8930_rpm_data __initdata = {
 		MSM_RPM_STATUS_ID_MAP(8930, CXO_BUFFERS),
 		MSM_RPM_STATUS_ID_MAP(8930, USB_OTG_SWITCH),
 		MSM_RPM_STATUS_ID_MAP(8930, HDMI_SWITCH),
-		MSM_RPM_STATUS_ID_MAP(8930, DDR_DMM_0),
-		MSM_RPM_STATUS_ID_MAP(8930, DDR_DMM_1),
 		MSM_RPM_STATUS_ID_MAP(8930, QDSS_CLK),
 		MSM_RPM_STATUS_ID_MAP(8930, VOLTAGE_CORNER),
 	},
@@ -286,6 +286,31 @@ struct platform_device msm8930_rpm_stat_device = {
 	.dev = {
 		.platform_data = &msm_rpm_stat_pdata,
 	},
+};
+
+static struct resource msm_rpm_rbcpr_resource = {
+	.start = 0x0010CB00,
+	.end = 0x0010CB00 + SZ_8K - 1,
+	.flags = IORESOURCE_MEM,
+};
+
+static struct msm_rpmrbcpr_platform_data msm_rpm_rbcpr_pdata = {
+	.rbcpr_data = {
+		.upside_steps = 1,
+		.downside_steps = 2,
+		.svs_voltage = 1050000,
+		.nominal_voltage = 1162500,
+		.turbo_voltage = 1287500,
+	},
+};
+
+struct platform_device msm8930_rpm_rbcpr_device = {
+	.name = "msm_rpm_rbcpr",
+	.id = -1,
+	.dev = {
+		.platform_data = &msm_rpm_rbcpr_pdata,
+	},
+	.resource = &msm_rpm_rbcpr_resource,
 };
 
 static int msm8930_LPM_latency = 1000; /* >100 usec for WFI */
@@ -354,6 +379,21 @@ struct platform_device msm_bus_8930_sys_fpb = {
 struct platform_device msm_bus_8930_cpss_fpb = {
 	.name  = "msm_bus_fabric",
 	.id    = MSM_BUS_FAB_CPSS_FPB,
+};
+
+struct platform_device msm8627_device_acpuclk = {
+	.name		= "acpuclk-8627",
+	.id		= -1,
+};
+
+struct platform_device msm8930_device_acpuclk = {
+	.name		= "acpuclk-8930",
+	.id		= -1,
+};
+
+struct platform_device msm8930aa_device_acpuclk = {
+	.name		= "acpuclk-8930aa",
+	.id		= -1,
 };
 
 static struct fs_driver_data gfx3d_fs_data = {
@@ -436,8 +476,8 @@ struct platform_device *msm8930_footswitch[] __initdata = {
 	FS_8X60(FS_MDP,    "vdd",	"mdp.0",	&mdp_fs_data),
 	FS_8X60(FS_ROT,    "vdd",	"msm_rotator.0", &rot_fs_data),
 	FS_8X60(FS_IJPEG,  "vdd",	"msm_gemini.0", &ijpeg_fs_data),
-	FS_8X60(FS_VFE,    "fs_vfe",	NULL,	&vfe_fs_data),
-	FS_8X60(FS_VPE,    "fs_vpe",	NULL,	&vpe_fs_data),
+	FS_8X60(FS_VFE,    "vdd",	"msm_vfe.0",	&vfe_fs_data),
+	FS_8X60(FS_VPE,    "vdd",	"msm_vpe.0",	&vpe_fs_data),
 	FS_8X60(FS_GFX3D,  "vdd",	"kgsl-3d0.0",	&gfx3d_fs_data),
 	FS_8X60(FS_VED,    "vdd",	"msm_vidc.0",	&ved_fs_data),
 };
@@ -696,6 +736,7 @@ struct msm_vidc_platform_data apq8930_vidc_platform_data = {
 #endif
 	.disable_dmx = 1,
 	.disable_fullhd = 0,
+	.fw_addr = 0x9fe00000,
 };
 
 struct platform_device apq8930_msm_device_vidc = {
@@ -767,12 +808,12 @@ struct msm_iommu_domain_name msm8930_iommu_ctx_names[] = {
 	/* Rotator */
 	{
 		.name = "rot_src",
-		.domain = ROTATOR_DOMAIN,
+		.domain = ROTATOR_SRC_DOMAIN,
 	},
 	/* Rotator */
 	{
 		.name = "rot_dst",
-		.domain = ROTATOR_DOMAIN,
+		.domain = ROTATOR_SRC_DOMAIN,
 	},
 	/* Video */
 	{
@@ -828,18 +869,18 @@ static struct mem_pool msm8930_camera_pools[] =  {
 		},
 };
 
-static struct mem_pool msm8930_display_pools[] =  {
+static struct mem_pool msm8930_display_read_pools[] =  {
 	[GEN_POOL] =
-	/* One address space for display */
+	/* One address space for display reads */
 		{
 			.paddr	= SZ_128K,
 			.size	= SZ_2G - SZ_128K,
 		},
 };
 
-static struct mem_pool msm8930_rotator_pools[] =  {
+static struct mem_pool msm8930_rotator_src_pools[] =  {
 	[GEN_POOL] =
-	/* One address space for rotator */
+	/* One address space for rotator src */
 		{
 			.paddr	= SZ_128K,
 			.size	= SZ_2G - SZ_128K,
@@ -855,13 +896,13 @@ static struct msm_iommu_domain msm8930_iommu_domains[] = {
 			.iova_pools = msm8930_camera_pools,
 			.npools = ARRAY_SIZE(msm8930_camera_pools),
 		},
-		[DISPLAY_DOMAIN] = {
-			.iova_pools = msm8930_display_pools,
-			.npools = ARRAY_SIZE(msm8930_display_pools),
+		[DISPLAY_READ_DOMAIN] = {
+			.iova_pools = msm8930_display_read_pools,
+			.npools = ARRAY_SIZE(msm8930_display_read_pools),
 		},
-		[ROTATOR_DOMAIN] = {
-			.iova_pools = msm8930_rotator_pools,
-			.npools = ARRAY_SIZE(msm8930_rotator_pools),
+		[ROTATOR_SRC_DOMAIN] = {
+			.iova_pools = msm8930_rotator_src_pools,
+			.npools = ARRAY_SIZE(msm8930_rotator_src_pools),
 		},
 };
 
@@ -901,5 +942,25 @@ struct platform_device msm8930_rtb_device = {
 	.id             = -1,
 	.dev            = {
 		.platform_data = &msm8930_rtb_pdata,
+	},
+};
+
+#define MSM8930_L1_SIZE  SZ_1M
+/*
+ * The actual L2 size is smaller but we need a larger buffer
+ * size to store other dump information
+ */
+#define MSM8930_L2_SIZE  SZ_4M
+
+struct msm_cache_dump_platform_data msm8930_cache_dump_pdata = {
+	.l2_size = MSM8930_L2_SIZE,
+	.l1_size = MSM8930_L1_SIZE,
+};
+
+struct platform_device msm8930_cache_dump_device = {
+	.name           = "msm_cache_dump",
+	.id             = -1,
+	.dev            = {
+		.platform_data = &msm8930_cache_dump_pdata,
 	},
 };

@@ -381,7 +381,7 @@ static int msm_hsic_suspend(struct msm_hsic_per *mhsic)
 	 */
 	mb();
 
-	if (!mhsic->pdata->keep_core_clk_on_suspend_workaround) {
+	if (!mhsic->pdata->core_clk_always_on_workaround) {
 		clk_disable(mhsic->iface_clk);
 		clk_disable(mhsic->core_clk);
 	}
@@ -438,7 +438,7 @@ static int msm_hsic_resume(struct msm_hsic_per *mhsic)
 		dev_err(mhsic->dev, "%s failed to vote for TCXO %d\n",
 				__func__, ret);
 
-	if (!mhsic->pdata->keep_core_clk_on_suspend_workaround) {
+	if (!mhsic->pdata->core_clk_always_on_workaround) {
 		clk_enable(mhsic->iface_clk);
 		clk_enable(mhsic->core_clk);
 	}
@@ -635,7 +635,7 @@ static int __devinit msm_hsic_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct msm_hsic_per *mhsic;
 	int ret = 0;
-	struct msm_hsic_peripheral_platform_data *pdata;
+	struct ci13xxx_platform_data *pdata;
 
 	dev_dbg(&pdev->dev, "msm-hsic probe\n");
 
@@ -654,7 +654,8 @@ static int __devinit msm_hsic_probe(struct platform_device *pdev)
 	the_mhsic = mhsic;
 	platform_set_drvdata(pdev, mhsic);
 	mhsic->dev = &pdev->dev;
-	mhsic->pdata = pdata;
+	mhsic->pdata =
+		(struct msm_hsic_peripheral_platform_data *)pdata->prv_data;
 
 	mhsic->irq = platform_get_irq(pdev, 0);
 	if (mhsic->irq < 0) {

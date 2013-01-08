@@ -19,6 +19,7 @@
  * published by the Free Software Foundation.
  */
 
+#include <linux/module.h>
 #include "mc_drv_module.h"
 #include "mc_drv_module_linux_api.h"
 #include "mc_drv_module_android.h"

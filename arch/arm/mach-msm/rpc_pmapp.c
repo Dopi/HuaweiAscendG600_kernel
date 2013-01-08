@@ -13,6 +13,7 @@
 
 #include <linux/slab.h>
 #include <linux/err.h>
+#include <linux/module.h>
 #include <asm/mach-types.h>
 #include <mach/board.h>
 #include <mach/rpc_pmapp.h>

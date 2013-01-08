@@ -83,23 +83,13 @@ static int mipi_dsi_off(struct platform_device *pdev)
 
 	mdp4_overlay_dsi_state_set(ST_DSI_SUSPEND);
 
-	/*
-	 * Description: dsi clock is need to perform shutdown.
-	 * mdp4_dsi_cmd_dma_busy_wait() will enable dsi clock if disabled.
-	 * also, wait until dma (overlay and dmap) finish.
+	/* make sure dsi clk is on so that
+	 * dcs commands can be sent
 	 */
-	if (mfd->panel_info.type == MIPI_CMD_PANEL) {
-		if (mdp_rev >= MDP_REV_41) {
-			mdp4_dsi_cmd_dma_busy_wait(mfd);
-			mdp4_dsi_blt_dmap_busy_wait(mfd);
-			mipi_dsi_mdp_busy_wait(mfd);
-		} else {
-			mdp3_dsi_cmd_dma_busy_wait(mfd);
-		}
-	} else {
-		/* video mode, wait until fifo cleaned */
-		mipi_dsi_controller_cfg(0);
-	}
+	mipi_dsi_clk_cfg(1);
+
+	/* make sure dsi_cmd_mdp is idle */
+	mipi_dsi_cmd_mdp_busy();
 
 	/*
 	 * Desctiption: change to DSI_CMD_MODE since it needed to
@@ -141,19 +131,16 @@ static int mipi_dsi_off(struct platform_device *pdev)
 	mdp_bus_scale_update_request(0);
 #endif
 
-	local_bh_disable();
+	spin_lock_bh(&dsi_clk_lock);
 	mipi_dsi_clk_disable();
-	local_bh_enable();
 
 	/* disbale dsi engine */
 	MIPI_OUTP(MIPI_DSI_BASE + 0x0000, 0);
 
 	mipi_dsi_phy_ctrl(0);
 
-
-	local_bh_disable();
 	mipi_dsi_ahb_ctrl(0);
-	local_bh_enable();
+	spin_unlock_bh(&dsi_clk_lock);
 
 	mipi_dsi_unprepare_clocks();
 	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_power_save)
@@ -197,9 +184,7 @@ static int mipi_dsi_on(struct platform_device *pdev)
 	cont_splash_clk_ctrl(0);
 	mipi_dsi_prepare_clocks();
 
-	local_bh_disable();
 	mipi_dsi_ahb_ctrl(1);
-	local_bh_enable();
 
 	clk_rate = mfd->fbi->var.pixclock;
 	clk_rate = min(clk_rate, mfd->panel_info.clk_max);
@@ -211,17 +196,17 @@ static int mipi_dsi_on(struct platform_device *pdev)
   * and mipi dsi will work abnormal.
   */
 #ifdef CONFIG_HUAWEI_KERNEL
-	local_bh_disable();
+	//local_bh_disable();
 	mipi_dsi_clk_enable();
-	local_bh_enable();
+	//local_bh_enable();
 #endif
+
 	mipi_dsi_phy_ctrl(1);
 
 	if (mdp_rev == MDP_REV_42 && mipi_dsi_pdata)
 		target_type = mipi_dsi_pdata->target_type;
 
 	mipi_dsi_phy_init(0, &(mfd->panel_info), target_type);
-
 /*
   * It because of the reset and clock order,
   * that Qualcomm baseband will be issued a special waveform,
@@ -229,11 +214,10 @@ static int mipi_dsi_on(struct platform_device *pdev)
   * and mipi dsi will work abnormal.
   */
 #ifndef CONFIG_HUAWEI_KERNEL
-	local_bh_disable();
+	//local_bh_disable();
 	mipi_dsi_clk_enable();
-	local_bh_enable();
+	//local_bh_enable();
 #endif
-
 	MIPI_OUTP(MIPI_DSI_BASE + 0x114, 1);
 	MIPI_OUTP(MIPI_DSI_BASE + 0x114, 0);
 

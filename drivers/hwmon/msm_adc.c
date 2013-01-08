@@ -26,6 +26,7 @@
 #include <linux/pmic8058-xoadc.h>
 #include <linux/slab.h>
 #include <linux/semaphore.h>
+#include <linux/module.h>
 
 #include <mach/dal.h>
 

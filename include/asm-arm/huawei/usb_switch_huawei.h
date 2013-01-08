@@ -65,6 +65,11 @@ typedef  struct _usbsdms_read_toc_cmd_type
    u8  control;
 } usbsdms_read_toc_cmd_type;
 
+/* vendor and country string */
+#define COUNTRY_JAPAN   "jp"
+#define VENDOR_EMOBILE  "emobile"
+#define COUNTRY_US   "us"
+#define VENDOR_TRACFONE  "tracfone"
 
 extern void usb_port_switch_request(int usb_pid_index);
 

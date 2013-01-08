@@ -20,6 +20,7 @@
 
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/module.h>
 #include <mach/rpc_hsusb.h>
 #include <asm/mach-types.h>
 

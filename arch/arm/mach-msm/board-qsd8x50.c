@@ -49,6 +49,7 @@
 #include <mach/msm_battery.h>
 #include <mach/rpc_server_handset.h>
 #include <mach/socinfo.h>
+#include <mach/proc_comm.h>
 
 #include "devices.h"
 #include "timer.h"
@@ -57,7 +58,6 @@
 #include "pm.h"
 #include "irq.h"
 #include "pm-boot.h"
-#include "proc_comm.h"
 #ifdef CONFIG_USB_ANDROID
 #include <linux/usb/android_composite.h>
 #endif
@@ -2409,7 +2409,7 @@ static void __init qsd8x50_init(void)
 {
 	msm_clock_init(&qds8x50_clock_init_data);
 	qsd8x50_cfg_smc91x();
-	acpuclk_init(&acpuclk_8x50_soc_data);
+	platform_device_register(&msm8x50_device_acpuclk);
 
 	msm_hsusb_pdata.swfi_latency =
 		msm_pm_data
@@ -2526,7 +2526,7 @@ static void __init qsd8x50_map_io(void)
 }
 
 MACHINE_START(QSD8X50_SURF, "QCT QSD8X50 SURF")
-	.boot_params = PLAT_PHYS_OFFSET + 0x100,
+	.atag_offset = 0x100,
 	.map_io = qsd8x50_map_io,
 	.init_irq = qsd8x50_init_irq,
 	.init_machine = qsd8x50_init,
@@ -2534,7 +2534,7 @@ MACHINE_START(QSD8X50_SURF, "QCT QSD8X50 SURF")
 MACHINE_END
 
 MACHINE_START(QSD8X50_FFA, "QCT QSD8X50 FFA")
-	.boot_params = PLAT_PHYS_OFFSET + 0x100,
+	.atag_offset = 0x100,
 	.map_io = qsd8x50_map_io,
 	.init_irq = qsd8x50_init_irq,
 	.init_machine = qsd8x50_init,

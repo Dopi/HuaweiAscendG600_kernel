@@ -1,9 +1,9 @@
 /*
  * Linux cfg80211 driver
  *
- * Copyright (C) 1999-2011, Broadcom Corporation
+ * Copyright (C) 1999-2012, Broadcom Corporation
  * 
- *         Unless you and Broadcom execute a separate written software license
+ *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfg80211.h,v 1.1.4.1.2.8 2011/02/09 01:37:52 Exp $
+ * $Id: wl_cfg80211.h 316895 2012-02-24 00:05:41Z $
  */
 
 #ifndef _wl_cfg80211_h_
@@ -444,12 +444,12 @@ struct wl_priv {
 	struct timer_list scan_timeout;   /* Timer for catch scan event timeout */
 };
 
+
 static inline struct wl_bss_info *next_bss(struct wl_scan_results *list, struct wl_bss_info *bss)
 {
 	return bss = bss ?
 		(struct wl_bss_info *)((uintptr) bss + dtoh32(bss->length)) : list->bss_info;
 }
-
 static inline s32
 wl_alloc_netinfo(struct wl_priv *wl, struct net_device *ndev,
 	struct wireless_dev * wdev, s32 mode)
@@ -470,7 +470,6 @@ wl_alloc_netinfo(struct wl_priv *wl, struct net_device *ndev,
 	}
 	return err;
 }
-
 static inline void
 wl_dealloc_netinfo(struct wl_priv *wl, struct net_device *ndev)
 {
@@ -487,8 +486,8 @@ wl_dealloc_netinfo(struct wl_priv *wl, struct net_device *ndev)
 			kfree(_net_info);
 		}
 	}
-}
 
+}
 static inline void
 wl_delete_all_netinfo(struct wl_priv *wl)
 {
@@ -502,7 +501,6 @@ wl_delete_all_netinfo(struct wl_priv *wl)
 	}
 	wl->iface_cnt = 0;
 }
-
 static inline bool
 wl_get_status_all(struct wl_priv *wl, s32 status)
 
@@ -516,7 +514,6 @@ wl_get_status_all(struct wl_priv *wl, s32 status)
 	}
 	return cnt? true: false;
 }
-
 static inline void
 wl_set_status_by_netdev(struct wl_priv *wl, s32 status,
 	struct net_device *ndev, u32 op)
@@ -540,6 +537,7 @@ wl_set_status_by_netdev(struct wl_priv *wl, s32 status,
 		}
 
 	}
+
 }
 
 static inline u32
@@ -567,6 +565,7 @@ wl_get_mode_by_netdev(struct wl_priv *wl, struct net_device *ndev)
 	return -1;
 }
 
+
 static inline void
 wl_set_mode_by_netdev(struct wl_priv *wl, struct net_device *ndev,
 	s32 mode)
@@ -578,7 +577,6 @@ wl_set_mode_by_netdev(struct wl_priv *wl, struct net_device *ndev,
 					_net_info->mode = mode;
 	}
 }
-
 static inline struct wl_profile *
 wl_get_profile_by_netdev(struct wl_priv *wl, struct net_device *ndev)
 {
@@ -654,9 +652,7 @@ extern int wl_cfg80211_hang(struct net_device *dev, u16 reason);
 extern s32 wl_mode_to_nl80211_iftype(s32 mode);
 int wl_cfg80211_do_driver_init(struct net_device *net);
 void wl_cfg80211_enable_trace(int level);
-
-/* do scan abort */
-extern s32 wl_cfg80211_scan_abort(struct wl_priv *wl, struct net_device *ndev);
-
 extern s32 wl_cfg80211_if_is_group_owner(void);
+extern chanspec_t wl_ch_host_to_driver(u16 channel);
+
 #endif				/* _wl_cfg80211_h_ */

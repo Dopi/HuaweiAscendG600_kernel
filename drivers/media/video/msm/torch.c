@@ -115,7 +115,7 @@ static long hw_camera_led_ioctl(struct file *filep ,unsigned int cmd, unsigned l
 				|| machine_is_msm8x25_C8950D()
 				|| machine_is_msm8x25_U8950D()
 				|| machine_is_msm8x25_U8951()
-                || machine_is_msm8x25_C8951()
+                || machine_is_msm8x25_C8813()
                 || machine_is_msm8x25_H881C()
 				||machine_is_msm8x25_U8950())
 				{

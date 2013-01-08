@@ -338,7 +338,9 @@ static void hci_conn_idle(unsigned long arg)
 
 	BT_DBG("conn %p mode %d", conn, conn->mode);
 
+	hci_dev_lock(conn->hdev);
 	hci_conn_enter_sniff_mode(conn);
+	hci_dev_unlock(conn->hdev);
 }
 
 struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type,
@@ -869,6 +871,9 @@ void hci_conn_enter_active_mode(struct hci_conn *conn, __u8 force_active)
 	if (test_bit(HCI_RAW, &hdev->flags))
 		return;
 
+	if (conn->type == LE_LINK)
+		return;
+
 	if (conn->mode != HCI_CM_SNIFF)
 		goto timer;
 
@@ -895,6 +900,9 @@ void hci_conn_enter_sniff_mode(struct hci_conn *conn)
 	BT_DBG("conn %p mode %d", conn, conn->mode);
 
 	if (test_bit(HCI_RAW, &hdev->flags))
+		return;
+
+	if (conn->type == LE_LINK)
 		return;
 
 	if (!lmp_sniff_capable(hdev) || !lmp_sniff_capable(conn))
@@ -1209,3 +1217,4 @@ int hci_set_auth_info(struct hci_dev *hdev, void __user *arg)
 
 	return copy_to_user(arg, &req, sizeof(req)) ? -EFAULT : 0;
 }
+

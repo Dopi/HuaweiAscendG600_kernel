@@ -28,7 +28,7 @@
 #define LCD_Y_QHD   960
 /* reduce the value */
 #define LCD_ALL_QHD_45INCHTP     1037
-#define LCD_ALL_FWVGA_45INCHTP     932  
+#define LCD_ALL_FWVGA_45INCHTP     922  
 #define LCD_X_FWVGA 480
 #define LCD_Y_FWVGA 854
 #define LCD_ALL_QVGA        347

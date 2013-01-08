@@ -61,10 +61,6 @@ struct msm_camera_device_platform_data {
 	struct msm_camera_io_ext ioext;
 	struct msm_camera_io_clk ioclk;
 	uint8_t csid_core;
-	uint8_t is_csiphy;
-	uint8_t is_csic;
-	uint8_t is_csid;
-	uint8_t is_ispif;
 	uint8_t is_vpe;
 	struct msm_bus_scale_pdata *cam_bus_scale_table;
 #ifdef CONFIG_HUAWEI_CAMERA  
@@ -234,6 +230,7 @@ struct msm_camera_gpio_conf {
 	uint8_t camera_off_table_size;
 	uint32_t *camera_on_table;
 	uint8_t camera_on_table_size;
+	void (* get_correct_gpio_set)(void);
 };
 
 enum msm_camera_i2c_mux_mode {
@@ -283,6 +280,10 @@ struct msm_actuator_info {
 	int vcm_enable;
 };
 
+struct msm_eeprom_info {
+	struct i2c_board_info const *board_info;
+	int bus_id;
+};
 #ifdef CONFIG_HUAWEI_CAMERA
 struct msm_camera_sensor_vreg {
 	const char *vreg_name;
@@ -290,10 +291,6 @@ struct msm_camera_sensor_vreg {
     uint8_t always_on;
 };
 #endif 
-struct msm_eeprom_info {
-	struct i2c_board_info const *board_info;
-	int bus_id;
-};
 
 struct msm_camera_sensor_info {
 	const char *sensor_name;
@@ -318,6 +315,7 @@ struct msm_camera_sensor_info {
 	enum msm_sensor_type sensor_type;
 	struct msm_actuator_info *actuator_info;
 	int pmic_gpio_enable;
+	struct msm_eeprom_info *eeprom_info;
 	#ifdef CONFIG_HUAWEI_CAMERA
 	/*we can stop camera probe after one probe succeed via the variable*/
 	int slave_sensor;
@@ -332,8 +330,6 @@ struct msm_camera_sensor_info {
 	#endif
 	void (* get_camera_vreg)(struct msm_camera_sensor_platform_info *);
 	/*patch from Qualcomm*/
-	int (*sensor_lcd_gpio_onoff)(int on);
-	struct msm_eeprom_info *eeprom_info;
 };
 
 struct msm_camera_board_info {
@@ -352,6 +348,17 @@ struct snd_endpoint {
 
 struct msm_snd_endpoints {
 	struct snd_endpoint *endpoints;
+	unsigned num;
+};
+
+struct cad_endpoint {
+	int id;
+	const char *name;
+	uint32_t capability;
+};
+
+struct msm_cad_endpoints {
+	struct cad_endpoint *endpoints;
 	unsigned num;
 };
 
@@ -375,6 +382,7 @@ enum msm_adspdec_concurrency {
 	MSM_ADSP_CODEC_AMRWB = 11,
 	MSM_ADSP_CODEC_EVRC = 12,
 	MSM_ADSP_CODEC_WMAPRO = 13,
+	MSM_ADSP_CODEC_AC3 = 23,
 	MSM_ADSP_MODE_TUNNEL = 24,
 	MSM_ADSP_MODE_NONTUNNEL = 25,
 	MSM_ADSP_MODE_LP = 26,
@@ -432,9 +440,7 @@ struct msm_panel_common_pdata {
 	void (*panel_config_gpio)(int);
 	int (*vga_switch)(int select_vga);
 	int *gpio_num;
-	int mdp_core_clk_rate;
-	unsigned num_mdp_clk;
-	int *mdp_core_clk_table;
+	u32 mdp_max_clk;
 #ifdef CONFIG_MSM_BUS_SCALING
 	struct msm_bus_scale_pdata *mdp_bus_scale_table;
 #endif
@@ -443,6 +449,7 @@ struct msm_panel_common_pdata {
 	u32 ov1_wb_size;  /* overlay1 writeback size */
 	u32 mem_hid;
 	char cont_splash_enabled;
+	char mdp_iommu_split_domain;
 };
 
 
@@ -508,10 +515,15 @@ struct lvds_panel_platform_data {
 	int *gpio;
 };
 
+struct msm_wfd_platform_data {
+	char (*wfd_check_mdp_iommu_split)(void);
+};
+
 #define PANEL_NAME_MAX_LEN 50
 struct msm_fb_platform_data {
 	int (*detect_client)(const char *name);
 	int mddi_prescan;
+	unsigned char ext_resolution;
 	int (*allow_set_offset)(void);
 	char prim_panel_name[PANEL_NAME_MAX_LEN];
 	char ext_panel_name[PANEL_NAME_MAX_LEN];
@@ -524,14 +536,27 @@ struct msm_hdmi_platform_data {
 	int (*enable_5v)(int on);
 	int (*core_power)(int on, int show);
 	int (*cec_power)(int on);
+	int (*panel_power)(int on);
+	int (*gpio_config)(int on);
 	int (*init_irq)(void);
 	bool (*check_hdcp_hw_support)(void);
+	bool is_mhl_enabled;
 };
 
 struct msm_mhl_platform_data {
 	int irq;
-	int (*gpio_setup)(int on);
-	void (*reset_pin)(int on);
+	/* GPIO no. for mhl intr */
+	uint32_t gpio_mhl_int;
+	/* GPIO no. for mhl block reset */
+	uint32_t gpio_mhl_reset;
+	/*
+	 * below gpios are specific to targets
+	 * that have the integrated MHL soln.
+	 */
+	/* GPIO no. for mhl block power */
+	uint32_t gpio_mhl_power;
+	/* GPIO no. for hdmi-mhl mux */
+	uint32_t gpio_hdmi_mhl_mux;
 };
 
 struct msm_i2c_platform_data {
@@ -559,11 +584,13 @@ struct msm_vidc_platform_data {
 	int disable_dmx;
 	int disable_fullhd;
 	u32 cp_enabled;
+	u32 secure_wb_heap;
 #ifdef CONFIG_MSM_BUS_SCALING
 	struct msm_bus_scale_pdata *vidc_bus_client_pdata;
 #endif
 	int cont_mode_dpb_count;
 	int disable_turbo;
+	unsigned long fw_addr;
 };
 
 struct vcap_platform_data {
@@ -581,11 +608,11 @@ struct isp1763_platform_data {
 /* common init routines for use by arch/arm/mach-msm/board-*.c */
 
 #ifdef CONFIG_OF_DEVICE
-void msm_copper_init(struct of_dev_auxdata **);
+void msm_8974_init(struct of_dev_auxdata **);
 #endif
 void msm_add_devices(void);
-void msm_copper_add_devices(void);
-void msm_copper_add_drivers(void);
+void msm_8974_add_devices(void);
+void msm_8974_add_drivers(void);
 void msm_map_common_io(void);
 void msm_map_qsd8x50_io(void);
 void msm_map_msm8x60_io(void);
@@ -594,15 +621,15 @@ void msm_map_msm8930_io(void);
 void msm_map_apq8064_io(void);
 void msm_map_msm7x30_io(void);
 void msm_map_fsm9xxx_io(void);
-void msm_map_copper_io(void);
+void msm_map_8974_io(void);
 void msm_map_msm8625_io(void);
 void msm_map_msm9625_io(void);
 void msm_init_irq(void);
-void msm_copper_init_irq(void);
+void msm_8974_init_irq(void);
 void vic_handle_irq(struct pt_regs *regs);
-void msm_copper_reserve(void);
-void msm_copper_very_early(void);
-void msm_copper_init_gpiomux(void);
+void msm_8974_reserve(void);
+void msm_8974_very_early(void);
+void msm_8974_init_gpiomux(void);
 
 struct mmc_platform_data;
 int msm_add_sdcc(unsigned int controller,

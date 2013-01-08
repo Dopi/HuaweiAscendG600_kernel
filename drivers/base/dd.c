@@ -45,7 +45,7 @@
  * retry them.
  *
  * The deferred_probe_mutex must be held any time the deferred_probe_*_list
- * of the (struct device*)->deferred_probe pointers are manipulated
+ * of the (struct device*)->p->deferred_probe pointers are manipulated
  */
 static DEFINE_MUTEX(deferred_probe_mutex);
 static LIST_HEAD(deferred_probe_pending_list);
@@ -58,6 +58,7 @@ static struct workqueue_struct *deferred_wq;
 static void deferred_probe_work_func(struct work_struct *work)
 {
 	struct device *dev;
+	struct device_private *private;
 	/*
 	 * This block processes every device in the deferred 'active' list.
 	 * Each device is removed from the active list and passed to
@@ -72,14 +73,17 @@ static void deferred_probe_work_func(struct work_struct *work)
 	 */
 	mutex_lock(&deferred_probe_mutex);
 	while (!list_empty(&deferred_probe_active_list)) {
-		dev = list_first_entry(&deferred_probe_active_list,
-					typeof(*dev), deferred_probe);
-		list_del_init(&dev->deferred_probe);
+		private = list_first_entry(&deferred_probe_active_list,
+					typeof(*dev->p), deferred_probe);
+		dev = private->device;
+		list_del_init(&private->deferred_probe);
 
 		get_device(dev);
 
-		/* Drop the mutex while probing each device; the probe path
-		 * may manipulate the deferred list */
+		/*
+		 * Drop the mutex while probing each device; the probe path may
+		 * manipulate the deferred list
+		 */
 		mutex_unlock(&deferred_probe_mutex);
 		dev_dbg(dev, "Retrying from deferred list\n");
 		bus_probe_device(dev);
@@ -94,9 +98,9 @@ static DECLARE_WORK(deferred_probe_work, deferred_probe_work_func);
 static void driver_deferred_probe_add(struct device *dev)
 {
 	mutex_lock(&deferred_probe_mutex);
-	if (list_empty(&dev->deferred_probe)) {
+	if (list_empty(&dev->p->deferred_probe)) {
 		dev_dbg(dev, "Added to deferred list\n");
-		list_add(&dev->deferred_probe, &deferred_probe_pending_list);
+		list_add(&dev->p->deferred_probe, &deferred_probe_pending_list);
 	}
 	mutex_unlock(&deferred_probe_mutex);
 }
@@ -104,9 +108,9 @@ static void driver_deferred_probe_add(struct device *dev)
 void driver_deferred_probe_del(struct device *dev)
 {
 	mutex_lock(&deferred_probe_mutex);
-	if (!list_empty(&dev->deferred_probe)) {
+	if (!list_empty(&dev->p->deferred_probe)) {
 		dev_dbg(dev, "Removed from deferred list\n");
-		list_del_init(&dev->deferred_probe);
+		list_del_init(&dev->p->deferred_probe);
 	}
 	mutex_unlock(&deferred_probe_mutex);
 }
@@ -124,16 +128,20 @@ static void driver_deferred_probe_trigger(void)
 	if (!driver_deferred_probe_enable)
 		return;
 
-	/* A successful probe means that all the devices in the pending list
+	/*
+	 * A successful probe means that all the devices in the pending list
 	 * should be triggered to be reprobed.  Move all the deferred devices
-	 * into the active list so they can be retried by the workqueue */
+	 * into the active list so they can be retried by the workqueue
+	 */
 	mutex_lock(&deferred_probe_mutex);
 	list_splice_tail_init(&deferred_probe_pending_list,
 			      &deferred_probe_active_list);
 	mutex_unlock(&deferred_probe_mutex);
 
-	/* Kick the re-probe thread.  It may already be scheduled, but
-	 * it is safe to kick it again. */
+	/*
+	 * Kick the re-probe thread.  It may already be scheduled, but it is
+	 * safe to kick it again.
+	 */
 	queue_work(deferred_wq, &deferred_probe_work);
 }
 
@@ -169,8 +177,10 @@ static void driver_bound(struct device *dev)
 
 	klist_add_tail(&dev->p->knode_driver, &dev->driver->p->klist_devices);
 
-	/* Make sure the device is no longer in one of the deferred lists
-	 * and kick off retrying all pending devices */
+	/*
+	 * Make sure the device is no longer in one of the deferred lists and
+	 * kick off retrying all pending devices
+	 */
 	driver_deferred_probe_del(dev);
 	driver_deferred_probe_trigger();
 
@@ -282,6 +292,9 @@ probe_failed:
 		/* driver matched but the probe failed */
 		printk(KERN_WARNING
 		       "%s: probe of %s failed with error %d\n",
+		       drv->name, dev_name(dev), ret);
+	} else {
+		pr_debug("%s: probe of %s rejects match %d\n",
 		       drv->name, dev_name(dev), ret);
 	}
 	/*

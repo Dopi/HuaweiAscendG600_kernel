@@ -11,7 +11,9 @@
  *
  */
 #include <linux/kernel.h>
+#include <linux/bitops.h>
 #include <linux/platform_device.h>
+#include <linux/gpio.h>
 #include <linux/io.h>
 #include <linux/irq.h>
 #include <linux/i2c.h>
@@ -28,8 +30,9 @@
 #include <linux/ion.h>
 #include <linux/memory.h>
 #include <linux/memblock.h>
+#include <linux/msm_thermal.h>
 #include <linux/i2c/atmel_mxt_ts.h>
-#include <linux/cyttsp.h>
+#include <linux/cyttsp-qc.h>
 #include <linux/i2c/isa1200.h>
 #include <linux/gpio_keys.h>
 #include <linux/epm_adc.h>
@@ -49,7 +52,6 @@
 #include <mach/msm_spi.h>
 #include "timer.h"
 #include "devices.h"
-#include <mach/gpio.h>
 #include <mach/gpiomux.h>
 #include <mach/rpm.h>
 #ifdef CONFIG_ANDROID_PMEM
@@ -70,10 +72,11 @@
 #include <media/gpio-ir-recv.h>
 #include <linux/fmem.h>
 #include <mach/msm_pcie.h>
+#include <mach/restart.h>
+#include <mach/msm_iomap.h>
 
 #include "msm_watchdog.h"
 #include "board-8064.h"
-#include "acpuclock.h"
 #include "spm.h"
 #include <mach/mpm.h>
 #include "rpm_resources.h"
@@ -117,6 +120,13 @@
 #define MAX_FIXED_AREA_SIZE	0x10000000
 #define MSM_MM_FW_SIZE		(0x200000 - HOLE_SIZE)
 #define APQ8064_FW_START	APQ8064_FIXED_AREA_START
+
+#define QFPROM_RAW_FEAT_CONFIG_ROW0_MSB     (MSM_QFPROM_BASE + 0x23c)
+#define QFPROM_RAW_OEM_CONFIG_ROW0_LSB      (MSM_QFPROM_BASE + 0x220)
+
+/* PCIE AXI address space */
+#define PCIE_AXI_BAR_PHYS   0x08000000
+#define PCIE_AXI_BAR_SIZE   SZ_128M
 
 /* PCIe power enable pmic gpio */
 #define PCIE_PWR_EN_PMIC_GPIO 13
@@ -261,7 +271,7 @@ static int apq8064_paddr_to_memtype(unsigned int paddr)
 	return MEMTYPE_EBI1;
 }
 
-#define FMEM_ENABLED 1
+#define FMEM_ENABLED 0
 
 #ifdef CONFIG_ION_MSM
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
@@ -528,7 +538,7 @@ static void __init reserve_ion_memory(void)
 
 		if (heap->extra_data) {
 			int fixed_position = NOT_FIXED;
-			struct ion_cp_heap_pdata *pdata;
+			struct ion_cp_heap_pdata *pdata = NULL;
 
 			switch (heap->type) {
 			case ION_HEAP_TYPE_CP:
@@ -647,6 +657,9 @@ static int apq8064_change_memory_power(u64 start, u64 size,
 
 static char prim_panel_name[PANEL_NAME_MAX_LEN];
 static char ext_panel_name[PANEL_NAME_MAX_LEN];
+
+static int ext_resolution;
+
 static int __init prim_display_setup(char *param)
 {
 	if (strnlen(param, PANEL_NAME_MAX_LEN))
@@ -663,9 +676,18 @@ static int __init ext_display_setup(char *param)
 }
 early_param("ext_display", ext_display_setup);
 
+static int __init hdmi_resulution_setup(char *param)
+{
+	int ret;
+	ret = kstrtoint(param, 10, &ext_resolution);
+	return ret;
+}
+early_param("ext_resolution", hdmi_resulution_setup);
+
 static void __init apq8064_reserve(void)
 {
-	apq8064_set_display_params(prim_panel_name, ext_panel_name);
+	apq8064_set_display_params(prim_panel_name, ext_panel_name,
+		ext_resolution);
 	msm_reserve();
 	if (apq8064_fmem_pdata.size) {
 #if defined(CONFIG_ION_MSM) && defined(CONFIG_MSM_MULTIMEDIA_USE_ION)
@@ -991,7 +1013,7 @@ static struct wcd9xxx_pdata apq8064_tabla_platform_data = {
 	.micbias = {
 		.ldoh_v = TABLA_LDOH_2P85_V,
 		.cfilt1_mv = 1800,
-		.cfilt2_mv = 1800,
+		.cfilt2_mv = 2700,
 		.cfilt3_mv = 1800,
 		.bias1_cfilt_sel = TABLA_CFILT1_SEL,
 		.bias2_cfilt_sel = TABLA_CFILT2_SEL,
@@ -1058,7 +1080,7 @@ static struct wcd9xxx_pdata apq8064_tabla20_platform_data = {
 	.micbias = {
 		.ldoh_v = TABLA_LDOH_2P85_V,
 		.cfilt1_mv = 1800,
-		.cfilt2_mv = 1800,
+		.cfilt2_mv = 2700,
 		.cfilt3_mv = 1800,
 		.bias1_cfilt_sel = TABLA_CFILT1_SEL,
 		.bias2_cfilt_sel = TABLA_CFILT2_SEL,
@@ -1219,6 +1241,7 @@ static struct isa1200_platform_data isa1200_1_pdata = {
 	.name = "vibrator",
 	.dev_setup = isa1200_dev_setup,
 	.clk_enable = isa1200_clk_enable,
+	.need_pwm_clk = true,
 	.hap_en_gpio = ISA1200_HAP_EN_GPIO,
 	.hap_len_gpio = ISA1200_HAP_LEN_GPIO,
 	.max_timeout = 15000,
@@ -1695,12 +1718,22 @@ static struct platform_device qcedev_device = {
 };
 #endif
 
+static struct mdm_vddmin_resource mdm_vddmin_rscs = {
+	.rpm_id = MSM_RPM_ID_VDDMIN_GPIO,
+	.ap2mdm_vddmin_gpio = 30,
+	.modes  = 0x03,
+	.drive_strength = 8,
+	.mdm2ap_vddmin_gpio = 80,
+};
+
 static struct mdm_platform_data mdm_platform_data = {
 	.mdm_version = "3.0",
 	.ramdump_delay_ms = 2000,
 	.early_power_on = 1,
 	.sfr_query = 1,
+	.vddmin_resource = &mdm_vddmin_rscs,
 	.peripheral_platform_device = &apq8064_device_hsic_host,
+	.ramdump_timeout_ms = 120000,
 };
 
 static struct tsens_platform_data apq_tsens_pdata  = {
@@ -1714,6 +1747,14 @@ static struct tsens_platform_data apq_tsens_pdata  = {
 static struct platform_device msm_tsens_device = {
 	.name   = "tsens8960-tm",
 	.id = -1,
+};
+
+static struct msm_thermal_data msm_thermal_pdata = {
+	.sensor_id = 7,
+	.poll_ms = 1000,
+	.limit_temp = 60,
+	.temp_hysteresis = 10,
+	.limit_freq = 918000,
 };
 
 #define MSM_SHARED_RAM_PHYS 0x80000000
@@ -2038,12 +2079,22 @@ static struct msm_pcie_gpio_info_t msm_pcie_gpio_info[MSM_PCIE_MAX_GPIO] = {
 
 static struct msm_pcie_platform msm_pcie_platform_data = {
 	.gpio = msm_pcie_gpio_info,
+	.axi_addr = PCIE_AXI_BAR_PHYS,
+	.axi_size = PCIE_AXI_BAR_SIZE,
 };
+
+static int __init mpq8064_pcie_enabled(void)
+{
+	return !((readl_relaxed(QFPROM_RAW_FEAT_CONFIG_ROW0_MSB) & BIT(21)) ||
+		(readl_relaxed(QFPROM_RAW_OEM_CONFIG_ROW0_LSB) & BIT(4)));
+}
 
 static void __init mpq8064_pcie_init(void)
 {
-	msm_device_pcie.dev.platform_data = &msm_pcie_platform_data;
-	platform_device_register(&msm_device_pcie);
+	if (mpq8064_pcie_enabled()) {
+		msm_device_pcie.dev.platform_data = &msm_pcie_platform_data;
+		platform_device_register(&msm_device_pcie);
+	}
 }
 
 static struct platform_device apq8064_device_ext_5v_vreg __devinitdata = {
@@ -2109,14 +2160,15 @@ static struct platform_device *common_not_mpq_devices[] __initdata = {
 };
 
 static struct platform_device *common_devices[] __initdata = {
+	&apq8064_device_acpuclk,
 	&apq8064_device_dmov,
 	&apq8064_device_qup_spi_gsbi5,
 	&apq8064_device_ext_5v_vreg,
 	&apq8064_device_ext_mpp8_vreg,
 	&apq8064_device_ext_3p3v_vreg,
-	&apq8064_device_ext_ts_sw_vreg,
 	&apq8064_device_ssbi_pmic1,
 	&apq8064_device_ssbi_pmic2,
+	&apq8064_device_ext_ts_sw_vreg,
 	&msm_device_smd_apq8064,
 	&apq8064_device_otg,
 	&apq8064_device_gadget_peripheral,
@@ -2193,6 +2245,7 @@ static struct platform_device *common_devices[] __initdata = {
 	&apq8064_rpm_device,
 	&apq8064_rpm_log_device,
 	&apq8064_rpm_stat_device,
+	&apq_device_tz_log,
 	&msm_bus_8064_apps_fabric,
 	&msm_bus_8064_sys_fabric,
 	&msm_bus_8064_mm_fabric,
@@ -2208,6 +2261,8 @@ static struct platform_device *common_devices[] __initdata = {
 	&apq8064_cpu_idle_device,
 	&apq8064_msm_gov_device,
 	&apq8064_device_cache_erp,
+	&msm8960_device_ebi1_ch0_erp,
+	&msm8960_device_ebi1_ch1_erp,
 	&epm_adc_device,
 	&apq8064_qdss_device,
 	&msm_etb_device,
@@ -2216,7 +2271,9 @@ static struct platform_device *common_devices[] __initdata = {
 	&apq8064_etm_device,
 	&apq_cpudai_slim_4_rx,
 	&apq_cpudai_slim_4_tx,
+#ifdef CONFIG_MSM_GEMINI
 	&msm8960_gemini_device,
+#endif
 	&apq8064_iommu_domain_device,
 	&msm_tsens_device,
 	&apq8064_cache_dump_device,
@@ -2242,16 +2299,6 @@ static struct platform_device *cdp_devices[] __initdata = {
 #ifdef CONFIG_MSM_ROTATOR
 	&msm_rotator_device,
 #endif
-};
-
-static struct platform_device
-mpq8064_device_ext_5v_frc_vreg __devinitdata = {
-	.name	= GPIO_REGULATOR_DEV_NAME,
-	.id	= SX150X_GPIO(4, 10),
-	.dev	= {
-		.platform_data =
-			&mpq8064_gpio_regulator_pdata[GPIO_VREG_ID_FRC_5V],
-	},
 };
 
 static struct platform_device
@@ -2343,7 +2390,6 @@ static struct platform_device *mpq_devices[] __initdata = {
 	&msm_rotator_device,
 #endif
 	&gpio_ir_recv_pdev,
-	&mpq8064_device_ext_5v_frc_vreg,
 	&mpq8064_device_ext_1p2_buck_vreg,
 	&mpq8064_device_ext_1p8_buck_vreg,
 	&mpq8064_device_ext_2p2_buck_vreg,
@@ -2869,6 +2915,7 @@ static void enable_avc_i2c_bus(void)
 static void __init apq8064_common_init(void)
 {
 	msm_tsens_early_init(&apq_tsens_pdata);
+	msm_thermal_init(&msm_thermal_pdata);
 	if (socinfo_init() < 0)
 		pr_err("socinfo_init() failed!\n");
 	BUG_ON(msm_rpm_init(&apq8064_rpm_data));
@@ -2900,7 +2947,10 @@ static void __init apq8064_common_init(void)
 		platform_add_devices(common_not_mpq_devices,
 			ARRAY_SIZE(common_not_mpq_devices));
 	enable_ddr3_regulator();
+	msm_hsic_pdata.swfi_latency =
+		msm_rpmrs_levels[0].latency_us;
 	if (machine_is_apq8064_mtp()) {
+		msm_hsic_pdata.log2_irq_thresh = 5,
 		apq8064_device_hsic_host.dev.platform_data = &msm_hsic_pdata;
 		device_initialize(&apq8064_device_hsic_host.dev);
 	}
@@ -2916,7 +2966,6 @@ static void __init apq8064_common_init(void)
 		ARRAY_SIZE(apq8064_slim_devices));
 	apq8064_init_dsps();
 	msm_spm_init(msm_spm_data, ARRAY_SIZE(msm_spm_data));
-	acpuclk_init(&acpuclk_8064_soc_data);
 	msm_spm_l2_init(msm_spm_l2_data);
 	BUG_ON(msm_pm_boot_init(&msm_pm_boot_pdata));
 	msm_pm_init_sleep_status_data(&msm_pm_slp_sts_data);
@@ -2942,6 +2991,7 @@ static void __init apq8064_rumi3_init(void)
 {
 	apq8064_common_init();
 	ethernet_init();
+	msm_rotator_set_split_iommu_domain();
 	platform_add_devices(rumi3_devices, ARRAY_SIZE(rumi3_devices));
 	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
 }
@@ -2954,10 +3004,12 @@ static void __init apq8064_cdp_init(void)
 	if (machine_is_mpq8064_cdp() || machine_is_mpq8064_hrd() ||
 		machine_is_mpq8064_dtv()) {
 		enable_avc_i2c_bus();
+		msm_rotator_set_split_iommu_domain();
 		platform_add_devices(mpq_devices, ARRAY_SIZE(mpq_devices));
 		mpq8064_pcie_init();
 	} else {
 		ethernet_init();
+		msm_rotator_set_split_iommu_domain();
 		platform_add_devices(cdp_devices, ARRAY_SIZE(cdp_devices));
 		spi_register_board_info(spi_board_info,
 						ARRAY_SIZE(spi_board_info));
@@ -2965,7 +3017,9 @@ static void __init apq8064_cdp_init(void)
 	apq8064_init_fb();
 	apq8064_init_gpu();
 	platform_add_devices(apq8064_footswitch, apq8064_num_footswitch);
+#ifdef CONFIG_MSM_CAMERA
 	apq8064_init_cam();
+#endif
 
 	if (machine_is_apq8064_cdp() || machine_is_apq8064_liquid())
 		platform_device_register(&cdp_kp_pdev);
@@ -2988,6 +3042,7 @@ MACHINE_START(APQ8064_SIM, "QCT APQ8064 SIMULATOR")
 	.handle_irq = gic_handle_irq,
 	.timer = &msm_timer,
 	.init_machine = apq8064_sim_init,
+	.restart = msm_restart,
 MACHINE_END
 
 MACHINE_START(APQ8064_RUMI3, "QCT APQ8064 RUMI3")
@@ -2998,6 +3053,7 @@ MACHINE_START(APQ8064_RUMI3, "QCT APQ8064 RUMI3")
 	.timer = &msm_timer,
 	.init_machine = apq8064_rumi3_init,
 	.init_early = apq8064_allocate_memory_regions,
+	.restart = msm_restart,
 MACHINE_END
 
 MACHINE_START(APQ8064_CDP, "QCT APQ8064 CDP")
@@ -3009,6 +3065,7 @@ MACHINE_START(APQ8064_CDP, "QCT APQ8064 CDP")
 	.init_machine = apq8064_cdp_init,
 	.init_early = apq8064_allocate_memory_regions,
 	.init_very_early = apq8064_early_reserve,
+	.restart = msm_restart,
 MACHINE_END
 
 MACHINE_START(APQ8064_MTP, "QCT APQ8064 MTP")
@@ -3020,6 +3077,7 @@ MACHINE_START(APQ8064_MTP, "QCT APQ8064 MTP")
 	.init_machine = apq8064_cdp_init,
 	.init_early = apq8064_allocate_memory_regions,
 	.init_very_early = apq8064_early_reserve,
+	.restart = msm_restart,
 MACHINE_END
 
 MACHINE_START(APQ8064_LIQUID, "QCT APQ8064 LIQUID")
@@ -3031,6 +3089,7 @@ MACHINE_START(APQ8064_LIQUID, "QCT APQ8064 LIQUID")
 	.init_machine = apq8064_cdp_init,
 	.init_early = apq8064_allocate_memory_regions,
 	.init_very_early = apq8064_early_reserve,
+	.restart = msm_restart,
 MACHINE_END
 
 MACHINE_START(MPQ8064_CDP, "QCT MPQ8064 CDP")
@@ -3042,6 +3101,7 @@ MACHINE_START(MPQ8064_CDP, "QCT MPQ8064 CDP")
 	.init_machine = apq8064_cdp_init,
 	.init_early = apq8064_allocate_memory_regions,
 	.init_very_early = apq8064_early_reserve,
+	.restart = msm_restart,
 MACHINE_END
 
 MACHINE_START(MPQ8064_HRD, "QCT MPQ8064 HRD")
@@ -3053,6 +3113,7 @@ MACHINE_START(MPQ8064_HRD, "QCT MPQ8064 HRD")
 	.init_machine = apq8064_cdp_init,
 	.init_early = apq8064_allocate_memory_regions,
 	.init_very_early = apq8064_early_reserve,
+	.restart = msm_restart,
 MACHINE_END
 
 MACHINE_START(MPQ8064_DTV, "QCT MPQ8064 DTV")
@@ -3064,5 +3125,6 @@ MACHINE_START(MPQ8064_DTV, "QCT MPQ8064 DTV")
 	.init_machine = apq8064_cdp_init,
 	.init_early = apq8064_allocate_memory_regions,
 	.init_very_early = apq8064_early_reserve,
+	.restart = msm_restart,
 MACHINE_END
 

@@ -17,6 +17,7 @@
 
 /* #define DEBUG */
 
+#include <linux/module.h>
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/init.h>

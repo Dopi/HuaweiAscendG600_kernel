@@ -9,7 +9,7 @@
  */
 #include <linux/irq.h>
 #include <linux/slab.h>
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
 #include <linux/radix-tree.h>
@@ -24,14 +24,32 @@
 #include <mach/msm_iomap.h>  
 #include <linux/io.h>
 
-#define TIMESTAMP_ADDR_TMP     (MSM_TMR_BASE + 0x08)
+#if defined(CONFIG_ARCH_MSM7X30) || defined(CONFIG_ARCH_MSM8X60) \
+	|| defined(CONFIG_ARCH_FSM9XXX)
+#define TIMESTAMP_ADDR_TMP (MSM_TMR_BASE + 0x08)
+#elif defined(CONFIG_ARCH_APQ8064) || defined(CONFIG_ARCH_MSM7X01A) || \
+	defined(CONFIG_ARCH_MSM7x25) || defined(CONFIG_ARCH_MSM7X27) || \
+	defined(CONFIG_ARCH_MSM7X27A) || defined(CONFIG_ARCH_MSM8960) || \
+	defined(CONFIG_ARCH_MSM9615) || defined(CONFIG_ARCH_QSD8X50)
+#define TIMESTAMP_ADDR_TMP (MSM_TMR_BASE + 0x04)
+#endif
 
-static inline unsigned int read_timestamp(void)  
-{  
-	unsigned int tick = 0;  
-	tick = readl(TIMESTAMP_ADDR_TMP);  
-	return tick;  
-}  
+static inline unsigned int read_timestamp(void)
+{
+	unsigned int tick = 0;
+	unsigned int count = 0;
+
+	/* no barriers necessary as the read value is a dependency for the
+	 * comparison operation so the processor shouldn't be able to
+	 * reorder things
+	 */
+	do {
+		tick = __raw_readl(TIMESTAMP_ADDR_TMP);
+		count++;
+	} while (tick != __raw_readl(TIMESTAMP_ADDR_TMP) && count < 5);
+
+	return tick;
+}
 
 struct irqs_timestamp {  
 	unsigned int irq;  
@@ -138,6 +156,7 @@ struct irq_desc *irq_to_desc(unsigned int irq)
 {
 	return radix_tree_lookup(&irq_desc_tree, irq);
 }
+EXPORT_SYMBOL(irq_to_desc);
 
 static void delete_irq_desc(unsigned int irq)
 {
@@ -387,6 +406,7 @@ EXPORT_SYMBOL_GPL(irq_free_descs);
  * @from:	Start the search from this irq number
  * @cnt:	Number of consecutive irqs to allocate.
  * @node:	Preferred node on which the irq descriptor should be allocated
+ * @owner:	Owning module (can be NULL)
  *
  * Returns the first irq number or error code
  */

@@ -72,9 +72,6 @@ extern unsigned long ebi1_phys_offset;
 #endif
 
 #endif
-/* deleted 30 line */
-
-
 
 #ifndef __ASSEMBLY__
 void *alloc_bootmem_aligned(unsigned long size, unsigned long alignment);
@@ -86,6 +83,7 @@ void invalidate_caches(unsigned long, unsigned long, unsigned long);
 int platform_physical_remove_pages(u64, u64);
 int platform_physical_active_pages(u64, u64);
 int platform_physical_low_power_pages(u64, u64);
+unsigned long get_ddr_size(void);
 
 extern int (*change_memory_power)(u64, u64, int);
 

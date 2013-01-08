@@ -19,6 +19,8 @@
 #include <linux/init.h>
 #include <linux/bitrev.h>
 #include <linux/bitops.h>
+#include <linux/module.h>
+//#include <linux/export.h>
 #include <linux/i2c.h>
 #include <linux/gpio.h>
 #include <asm/unaligned.h>

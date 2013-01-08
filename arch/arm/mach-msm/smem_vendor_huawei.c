@@ -26,7 +26,8 @@ smem_huawei_vender usb_para_data;
 static void import_kernel_nv(char *name)
 {
 	unsigned long pid_index;
-	char local_property_info[65];
+    /* init the variable */
+	char local_property_info[65] = {0};
 	char *country_name;
 	
     if (*name != '\0') 
@@ -80,7 +81,8 @@ static void import_kernel_nv(char *name)
  */
 void import_kernel_cmdline(void)
 {
-    char cmdline[512];
+    /* init the variable */
+    char cmdline[512] = {0};
     char *ptr;
     
 	printk(KERN_INFO "%s\n", __func__);

@@ -13,7 +13,7 @@
 
 #include <linux/delay.h>
 #include <linux/module.h>
-#include <mach/gpio.h>
+#include <linux/gpio.h>
 #include <mach/pmic.h>
 #include "msm_fb.h"
 
@@ -148,6 +148,13 @@ static void truly_disp_reginit(void)
 
 static int lcdc_truly_panel_on(struct platform_device *pdev)
 {
+	struct msm_fb_data_type *mfd = platform_get_drvdata(pdev);
+
+	if (!mfd->cont_splash_done) {
+		mfd->cont_splash_done = 1;
+		return 0;
+	}
+
 	/* Configure reset GPIO that drives DAC */
 	if (lcdc_truly_pdata->panel_config_gpio)
 		lcdc_truly_pdata->panel_config_gpio(1);

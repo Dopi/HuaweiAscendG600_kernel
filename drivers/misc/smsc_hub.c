@@ -19,6 +19,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/smsc3503.h>
+#include <linux/module.h>
 #include <mach/msm_xo.h>
 
 #define SMSC3503_I2C_ADDR 0x08

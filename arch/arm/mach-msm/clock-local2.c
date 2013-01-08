@@ -166,10 +166,7 @@ static int rcg_clk_set_rate(struct clk *c, unsigned long rate)
 	if (nf->freq_hz == FREQ_END)
 		return -EINVAL;
 
-	/* Check if frequency is actually changed. */
 	cf = rcg->current_freq;
-	if (nf == cf)
-		return 0;
 
 	if (rcg->c.count) {
 		/* TODO: Modify to use the prepare API */
@@ -285,7 +282,6 @@ static enum handoff _rcg_clk_handoff(struct rcg_clk *rcg, int has_mnd)
 			if (freq->d_val != d_regval)
 				continue;
 		}
-		pr_info("%s rate=%lu\n", rcg->c.dbg_name, freq->freq_hz);
 		break;
 	}
 
@@ -412,6 +408,19 @@ static int branch_clk_set_rate(struct clk *c, unsigned long rate)
 	return -EPERM;
 }
 
+static long branch_clk_round_rate(struct clk *c, unsigned long rate)
+{
+	struct branch_clk *branch = to_branch_clk(c);
+
+	if (branch->max_div)
+		return rate <= (branch->max_div) ? rate : -EPERM;
+
+	if (!branch->has_sibling)
+		return clk_round_rate(branch->parent, rate);
+
+	return -EPERM;
+}
+
 static unsigned long branch_clk_get_rate(struct clk *c)
 {
 	struct branch_clk *branch = to_branch_clk(c);
@@ -451,7 +460,6 @@ static enum handoff branch_clk_handoff(struct clk *c)
 	cbcr_regval = readl_relaxed(CBCR_REG(branch));
 	if ((cbcr_regval & CBCR_BRANCH_OFF_BIT))
 		return HANDOFF_DISABLED_CLK;
-	pr_info("%s enabled.\n", branch->c.dbg_name);
 
 	if (branch->parent) {
 		if (branch->parent->ops->handoff)
@@ -467,9 +475,6 @@ static int __branch_clk_reset(void __iomem *bcr_reg,
 	int ret = 0;
 	unsigned long flags;
 	u32 reg_val;
-
-	if (!bcr_reg)
-		return -EPERM;
 
 	spin_lock_irqsave(&local_clock_reg_lock, flags);
 	reg_val = readl_relaxed(bcr_reg);
@@ -495,6 +500,12 @@ static int __branch_clk_reset(void __iomem *bcr_reg,
 static int branch_clk_reset(struct clk *c, enum clk_reset_action action)
 {
 	struct branch_clk *branch = to_branch_clk(c);
+
+	if (!branch->bcr_reg) {
+		WARN("clk_reset called on an unsupported clock (%s)\n",
+			c->dbg_name);
+		return -EPERM;
+	}
 	return __branch_clk_reset(BCR_REG(branch), action);
 }
 
@@ -503,7 +514,13 @@ static int branch_clk_reset(struct clk *c, enum clk_reset_action action)
  */
 static int local_vote_clk_reset(struct clk *c, enum clk_reset_action action)
 {
-	struct branch_clk *vclk = to_branch_clk(c);
+	struct local_vote_clk *vclk = to_local_vote_clk(c);
+
+	if (!vclk->bcr_reg) {
+		WARN("clk_reset called on an unsupported clock (%s)\n",
+			c->dbg_name);
+		return -EPERM;
+	}
 	return __branch_clk_reset(BCR_REG(vclk), action);
 }
 
@@ -547,7 +564,6 @@ static enum handoff local_vote_clk_handoff(struct clk *c)
 	vote_regval = readl_relaxed(VOTE_REG(vclk));
 	if (!(vote_regval & vclk->en_mask))
 		return HANDOFF_DISABLED_CLK;
-	pr_info("%s enabled.\n", vclk->c.dbg_name);
 
 	return HANDOFF_ENABLED_CLK;
 }
@@ -573,10 +589,10 @@ struct clk_ops clk_ops_rcg_mnd = {
 struct clk_ops clk_ops_branch = {
 	.enable = branch_clk_enable,
 	.disable = branch_clk_disable,
-	.auto_off = branch_clk_disable,
 	.set_rate = branch_clk_set_rate,
 	.get_rate = branch_clk_get_rate,
 	.list_rate = branch_clk_list_rate,
+	.round_rate = branch_clk_round_rate,
 	.reset = branch_clk_reset,
 	.get_parent = branch_clk_get_parent,
 	.handoff = branch_clk_handoff,
@@ -585,7 +601,6 @@ struct clk_ops clk_ops_branch = {
 struct clk_ops clk_ops_vote = {
 	.enable = local_vote_clk_enable,
 	.disable = local_vote_clk_disable,
-	.auto_off = local_vote_clk_disable,
 	.reset = local_vote_clk_reset,
 	.handoff = local_vote_clk_handoff,
 };

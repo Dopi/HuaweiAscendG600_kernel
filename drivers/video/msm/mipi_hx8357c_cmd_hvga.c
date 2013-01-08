@@ -171,10 +171,10 @@ static int __init mipi_cmd_hx8357c_hvga_init(void)
 	struct msm_panel_info *pinfo = NULL;
 
 	lcd_panel_hvga = get_lcd_panel_type();
-	if ((MIPI_HX8357C_CHIMEI_HVGA != lcd_panel_hvga )
-		&& (MIPI_HX8357C_CHIMEI_IPS_HVGA != lcd_panel_hvga )
-		&& (MIPI_HX8357C_TIANMA_HVGA != lcd_panel_hvga )
-		&& (MIPI_HX8357C_TIANMA_IPS_HVGA != lcd_panel_hvga))
+	if ((MIPI_CMD_HX8357C_CHIMEI_HVGA != lcd_panel_hvga )
+		&& (MIPI_CMD_HX8357C_CHIMEI_IPS_HVGA != lcd_panel_hvga )
+		&& (MIPI_CMD_HX8357C_TIANMA_HVGA != lcd_panel_hvga )
+		&& (MIPI_CMD_HX8357C_TIANMA_IPS_HVGA != lcd_panel_hvga))
 	{
 		return 0;
 	}

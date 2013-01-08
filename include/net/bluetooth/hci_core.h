@@ -27,7 +27,7 @@
 #define __HCI_CORE_H
 
 #include <net/bluetooth/hci.h>
-
+#include <linux/interrupt.h>
 /* HCI upper protocols */
 #define HCI_PROTO_L2CAP	0
 #define HCI_PROTO_SCO	1
@@ -619,9 +619,9 @@ static inline void hci_conn_put(struct hci_conn *conn)
 			del_timer(&conn->idle_timer);
 			if (conn->state == BT_CONNECTED) {
 				timeo = msecs_to_jiffies(conn->disc_timeout);
-				/* ACL_LINK or LE_LINK disconnet timeout from 40secs(timeo *= 20) to 4secs(timeo *= 2)*/
+				/* ACL_LINK or LE_LINK disconnet timeout from 4secs(timeo *= 2) to 8secs(timeo *= 4)*/
 				if (!conn->out)
-					timeo *= 2;
+					timeo *= 4;
 			} else
 				timeo = msecs_to_jiffies(10);
 		} else
@@ -1018,6 +1018,8 @@ int mgmt_discoverable(u16 index, u8 discoverable);
 int mgmt_connectable(u16 index, u8 connectable);
 int mgmt_new_key(u16 index, struct link_key *key, u8 bonded);
 int mgmt_connected(u16 index, bdaddr_t *bdaddr, u8 le);
+int mgmt_le_conn_params(u16 index, bdaddr_t *bdaddr, u16 interval,
+						u16 latency, u16 timeout);
 int mgmt_disconnected(u16 index, bdaddr_t *bdaddr);
 int mgmt_disconnect_failed(u16 index);
 int mgmt_connect_failed(u16 index, bdaddr_t *bdaddr, u8 status);

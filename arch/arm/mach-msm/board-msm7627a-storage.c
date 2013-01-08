@@ -11,13 +11,13 @@
  *
  */
 
+#include <linux/kernel.h>
+#include <linux/regulator/consumer.h>
+#include <linux/gpio.h>
 #include <asm/mach-types.h>
 #include <asm/mach/mmc.h>
-#include <linux/regulator/consumer.h>
-#include <mach/gpio.h>
 #include <mach/gpiomux.h>
 #include <mach/board.h>
-
 #include "devices.h"
 #include "pm.h"
 #include "board-msm7627a.h"
@@ -56,17 +56,18 @@ struct sdcc_gpio {
  */
 #ifdef CONFIG_HUAWEI_KERNEL
 static struct msm_gpio sdc1_cfg_data[] = {
-	{GPIO_CFG(51, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_14MA),
+    /* decrease sdcard drive current */
+	{GPIO_CFG(51, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_10MA),
 								"sdc1_dat_3"},
-	{GPIO_CFG(52, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_14MA),
+	{GPIO_CFG(52, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_10MA),
 								"sdc1_dat_2"},
-	{GPIO_CFG(53, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_14MA),
+	{GPIO_CFG(53, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_10MA),
 								"sdc1_dat_1"},
-	{GPIO_CFG(54, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_14MA),
+	{GPIO_CFG(54, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_10MA),
 								"sdc1_dat_0"},
-	{GPIO_CFG(55, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_14MA),
+	{GPIO_CFG(55, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_10MA),
 								"sdc1_cmd"},
-	{GPIO_CFG(56, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_14MA),
+	{GPIO_CFG(56, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_10MA),
 								"sdc1_clk"},
 };
 #else
@@ -294,8 +295,7 @@ out:
 	return rc;
 }
 
-#if defined(CONFIG_MMC_MSM_SDC1_SUPPORT) \
-	&& defined(CONFIG_MMC_MSM_CARD_HW_DETECTION)
+#ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
 static unsigned int msm7627a_sdcc_slot_status(struct device *dev)
 {
 	int status;
@@ -318,7 +318,7 @@ static unsigned int msm7627a_sdcc_slot_status(struct device *dev)
             if (machine_is_msm7x27a_U8185() ||
                     machine_is_msm8x25_U8951D() ||
                     machine_is_msm8x25_U8951() ||
-                    machine_is_msm8x25_C8951()
+                    machine_is_msm8x25_C8813()
                     )
             {
                 //u8185 is different from other products.
@@ -343,9 +343,7 @@ static unsigned int msm7627a_sdcc_slot_status(struct device *dev)
 	}
 	return status;
 }
-#endif
 
-#ifdef CONFIG_MMC_MSM_SDC1_SUPPORT
 static struct mmc_platform_data sdc1_plat_data = {
 	.ocr_mask       = MMC_VDD_28_29,
 	.translate_vdd  = msm_sdcc_setup_power,
@@ -353,10 +351,8 @@ static struct mmc_platform_data sdc1_plat_data = {
 	.msmsdcc_fmin   = 144000,
 	.msmsdcc_fmid   = 24576000,
 	.msmsdcc_fmax   = 49152000,
-#ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
 	.status      = msm7627a_sdcc_slot_status,
 	.irq_flags   = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-#endif
 /*disable pm runtime of sd card*/
 #ifdef CONFIG_HUAWEI_KERNEL
     .disable_runtime_pm = true
@@ -419,6 +415,10 @@ static struct mmc_platform_data sdc3_plat_data = {
 	.msmsdcc_fmid   = 24576000,
 	.msmsdcc_fmax   = 49152000,
 	.nonremovable   = 1,
+	/*prevent emmc from stepping into pm runtime sleep*/
+#ifdef CONFIG_HUAWEI_KERNEL
+	.disable_runtime_pm = true,
+#endif
 };
 #endif
 
@@ -661,13 +661,11 @@ void __init msm7627a_init_mmc(void)
 	gpio_sdc1_config();
 	if (mmc_regulator_init(1, "mmc", 2850000))
 		return;
-#ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
 	/* 8x25 EVT do not use hw detector */
 	if (!(machine_is_msm8625_evt()))
 		sdc1_plat_data.status_irq = MSM_GPIO_TO_INT(gpio_sdc1_hw_det);
 	if (machine_is_msm8625_evt())
 		sdc1_plat_data.status = NULL;
-#endif
 
 	msm_add_sdcc(1, &sdc1_plat_data);
 #endif

@@ -16,6 +16,7 @@
 #define SMUX_PRIVATE_H
 
 #define SMUX_MAX_PKT_SIZE   8192
+#define SMUX_BROADCAST_LCID 0xFF
 
 /* SMUX Protocol Characters */
 #define SMUX_MAGIC          0x33FC
@@ -28,6 +29,13 @@
 #define SMUX_UT_ECHO_REQ    0xF0
 #define SMUX_UT_ECHO_ACK_OK 0xF1
 #define SMUX_UT_ECHO_ACK_FAIL 0xF2
+
+/* Maximum number of packets in retry queue */
+#define SMUX_RX_RETRY_MAX_PKTS 32
+#define SMUX_RX_WM_HIGH        16
+#define SMUX_RX_WM_LOW          4
+#define SMUX_TX_WM_LOW          2
+#define SMUX_TX_WM_HIGH         4
 
 struct tty_struct;
 
@@ -78,7 +86,6 @@ enum {
 /* Power command flags */
 enum {
 	SMUX_CMD_PWR_CTL_ACK =  1 << 0,
-	SMUX_CMD_PWR_CTL_SLEEP_REQ =  1 << 1,
 };
 
 /* Local logical channel states */

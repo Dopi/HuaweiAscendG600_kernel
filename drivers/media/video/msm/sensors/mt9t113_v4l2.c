@@ -12,12 +12,36 @@
  */
 
 #include "msm_sensor.h"
+#include "msm.h"
+
 #define SENSOR_NAME "mt9t113"
 #define PLATFORM_DRIVER_NAME "msm_camera_mt9t113"
 #define mt9t113_obj mt9t113_##obj
 
 DEFINE_MUTEX(mt9t113_mut);
 static struct msm_sensor_ctrl_t mt9t113_s_ctrl;
+
+#if 0
+ #undef CDBG
+ #define CDBG(fmt, args...) printk(KERN_INFO "mt9t113: " fmt, ## args)
+#endif
+
+static int mt9t113_csi_config=0;
+
+#define REGISTER_WRITE_WAIT_FW			0
+#define REGISTER_WRITE_WAIT_PATCH		1
+#define REGISTER_WRITE_WAIT_PREVIEW		10
+#define REGISTER_WRITE_WAIT_SNAPSHOT	11
+
+#define REGISTER_WRITE_RETRY		2
+
+enum mt9t113_setting_t
+{
+	RES_CAPTURE,
+	RES_PREVIEW,
+};
+
+static int32_t mt9t113_wait(struct msm_sensor_ctrl_t *s_ctrl,  int time);
 
 static struct msm_camera_i2c_reg_conf mt9t113_prev_settings[] = {
 	//================================================================================================
@@ -31,7 +55,7 @@ static struct msm_camera_i2c_reg_conf mt9t113_prev_settings[] = {
 
 static struct msm_camera_i2c_reg_conf mt9t113_snap_settings[] = {
     {0x098E, 0xEC09},   // MCU_ADDRESS [PRI_B_NUM_OF_FRAMES_RUN]
-    {0x0990, 0x0000},   // MCU_DATA_0
+    {0x0990, 0x00FF},   // MCU_DATA_0
     {0x098E, 0x8400},   // MCU_ADDRESS [SEQ_CMD]
     {0x0990, 0x0002},   // MCU_DATA_0
     {0x3400, 0x7A28},   // MIPI_CONTROL
@@ -40,7 +64,7 @@ static struct msm_camera_i2c_reg_conf mt9t113_snap_settings[] = {
 static struct msm_camera_i2c_reg_conf mt9t113_recommend_settings_1[] = {
     {0x0018, 0x4129}, 	// STANDBY_CONTROL_AND_STATUS
     {0x0018, 0x4029}, 	// STANDBY_CONTROL_AND_STATUS
-    {0x0010, 0x0118}, 	// PLL_DIVIDERS
+    {0x0010, 0x0318}, 	// PLL_DIVIDERS
     {0x0012, 0x0070}, 	// PLL_P_DIVIDERS
     {0x002A, 0x76A9}, 	// PLL_P4_P5_P6_DIVIDERS
     {0x0028, 0x0000},
@@ -193,57 +217,111 @@ static struct msm_camera_i2c_reg_conf mt9t113_recommend_settings_2[] = {
     {0x0990, 0x0000},   // MCU_DATA_0
 
     {0x098E, 0x4873}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_0]
-    {0x0990, 0x0214}, 	// MCU_DATA_0
+    {0x0990, 0x01EA}, 	// MCU_DATA_0
     {0x098E, 0x4889}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_0]
-    {0x0990, 0x0069}, 	// MCU_DATA_0
+    {0x0990, 0x005F}, 	// MCU_DATA_0
     {0x098E, 0x489F}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_0]
     {0x0990, 0x0100}, 	// MCU_DATA_0
     {0x098E, 0x4875}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_1]
-    {0x0990, 0xFF59}, 	// MCU_DATA_0
+    {0x0990, 0xFF76}, 	// MCU_DATA_0
     {0x098E, 0x488B}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_1]
-    {0x0990, 0xFF7E}, 	// MCU_DATA_0
+    {0x0990, 0xFF8A}, 	// MCU_DATA_0
     {0x098E, 0x48A1}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_1]
     {0x0990, 0x0000}, 	// MCU_DATA_0
     {0x098E, 0x4877}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_2]
-    {0x0990, 0xFFBB}, 	// MCU_DATA_0
+    {0x0990, 0xFFC4}, 	// MCU_DATA_0
     {0x098E, 0x488D}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_2]
-    {0x0990, 0x001B}, 	// MCU_DATA_0
+    {0x0990, 0x0018}, 	// MCU_DATA_0
     {0x098E, 0x48A3}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_2]
     {0x0990, 0x0000}, 	// MCU_DATA_0
     {0x098E, 0x4879}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_3]
-    {0x0990, 0xFF77}, 	// MCU_DATA_0
+    {0x0990, 0xFFA6}, 	// MCU_DATA_0
     {0x098E, 0x488F}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_3]
-    {0x0990, 0x001B}, 	// MCU_DATA_0
+    {0x0990, 0x0015}, 	// MCU_DATA_0
     {0x098E, 0x48A5}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_3]
     {0x0990, 0x0000}, 	// MCU_DATA_0
     {0x098E, 0x487B}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_4]
-    {0x0990, 0x01F7}, 	// MCU_DATA_0
+    {0x0990, 0x01B1}, 	// MCU_DATA_0
     {0x098E, 0x4891}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_4]
-    {0x0990, 0xFFE8}, 	// MCU_DATA_0
+    {0x0990, 0xFFEA}, 	// MCU_DATA_0
     {0x098E, 0x48A7}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_4]
     {0x0990, 0x0100}, 	// MCU_DATA_0
     {0x098E, 0x487D}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_5]
-    {0x0990, 0xFFCE}, 	// MCU_DATA_0
+    {0x0990, 0xFFDF}, 	// MCU_DATA_0
     {0x098E, 0x4893}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_5]
-    {0x0990, 0xFFF5}, 	// MCU_DATA_0
+    {0x0990, 0xFFF9},   	// MCU_DATA_0
     {0x098E, 0x48A9}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_5]
     {0x0990, 0x0000}, 	// MCU_DATA_0
     {0x098E, 0x487F}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_6]
-    {0x0990, 0xFFE9}, 	// MCU_DATA_0
+    {0x0990, 0xFFE4}, 	// MCU_DATA_0
     {0x098E, 0x4895}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_6]
-    {0x0990, 0x0002}, 	// MCU_DATA_0
+    {0x0990, 0xFFFD}, 	// MCU_DATA_0
     {0x098E, 0x48AB}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_6]
     {0x0990, 0x0000}, 	// MCU_DATA_0
     {0x098E, 0x4881}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_7]
-    {0x0990, 0xFF18}, 	// MCU_DATA_0
+    {0x0990, 0xFF05}, 	// MCU_DATA_0
     {0x098E, 0x4897}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_7]
-    {0x0990, 0x008D}, 	// MCU_DATA_0
+    {0x0990, 0x0087}, 	// MCU_DATA_0
     {0x098E, 0x48AD}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_7]
     {0x0990, 0x0000}, 	// MCU_DATA_0
     {0x098E, 0x4883}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_8]
-    {0x0990, 0x023D}, 	// MCU_DATA_0
+    {0x0990, 0x0258}, 	// MCU_DATA_0
     {0x098E, 0x4899}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_8]
-    {0x0990, 0xFF5A}, 	// MCU_DATA_0
+    {0x0990, 0xFF66}, 	// MCU_DATA_0
+    {0x098E, 0x48AF}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_8]
+    {0x0990, 0x0100}, 	// MCU_DATA_0
+    {0x098E, 0x4873}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_0]
+    {0x0990, 0x01EA}, 	// MCU_DATA_0
+    {0x098E, 0x4889}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_0]
+    {0x0990, 0x005F}, 	// MCU_DATA_0
+    {0x098E, 0x489F}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_0]
+    {0x0990, 0x0100}, 	// MCU_DATA_0
+    {0x098E, 0x4875}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_1]
+    {0x0990, 0xFF76}, 	// MCU_DATA_0
+    {0x098E, 0x488B}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_1]
+    {0x0990, 0xFF8A}, 	// MCU_DATA_0
+    {0x098E, 0x48A1}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_1]
+    {0x0990, 0x0000}, 	// MCU_DATA_0
+    {0x098E, 0x4877}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_2]
+    {0x0990, 0xFFC4}, 	// MCU_DATA_0
+    {0x098E, 0x488D}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_2]
+    {0x0990, 0x0018}, 	// MCU_DATA_0
+    {0x098E, 0x48A3}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_2]
+    {0x0990, 0x0000}, 	// MCU_DATA_0
+    {0x098E, 0x4879}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_3]
+    {0x0990, 0xFFA6}, 	// MCU_DATA_0
+    {0x098E, 0x488F}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_3]
+    {0x0990, 0x0015}, 	// MCU_DATA_0
+    {0x098E, 0x48A5}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_3]
+    {0x0990, 0x0000}, 	// MCU_DATA_0
+    {0x098E, 0x487B}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_4]
+    {0x0990, 0x01B1}, 	// MCU_DATA_0
+    {0x098E, 0x4891}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_4]
+    {0x0990, 0xFFEA}, 	// MCU_DATA_0
+    {0x098E, 0x48A7}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_4]
+    {0x0990, 0x0100}, 	// MCU_DATA_0
+    {0x098E, 0x487D}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_5]
+    {0x0990, 0xFFDF}, 	// MCU_DATA_0
+    {0x098E, 0x4893}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_5]
+    {0x0990, 0xFFF9},  	// MCU_DATA_0
+    {0x098E, 0x48A9}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_5]
+    {0x0990, 0x0000}, 	// MCU_DATA_0
+    {0x098E, 0x487F}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_6]
+    {0x0990, 0xFFE4}, 	// MCU_DATA_0
+    {0x098E, 0x4895}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_6]
+    {0x0990, 0xFFFD}, 	// MCU_DATA_0
+    {0x098E, 0x48AB}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_6]
+    {0x0990, 0x0000}, 	// MCU_DATA_0
+    {0x098E, 0x4881}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_7]
+    {0x0990, 0xFF05}, 	// MCU_DATA_0
+    {0x098E, 0x4897}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_7]
+    {0x0990, 0x0087}, 	// MCU_DATA_0
+    {0x098E, 0x48AD}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_7]
+    {0x0990, 0x0000}, 	// MCU_DATA_0
+    {0x098E, 0x4883}, 	// MCU_ADDRESS [CAM1_AWB_CCM_L_8]
+    {0x0990, 0x0258}, 	// MCU_DATA_0
+    {0x098E, 0x4899}, 	// MCU_ADDRESS [CAM1_AWB_CCM_RL_8]
+    {0x0990, 0xFF66}, 	// MCU_DATA_0
     {0x098E, 0x48AF}, 	// MCU_ADDRESS [CAM1_AWB_LL_CCM_8]
     {0x0990, 0x0100}, 	// MCU_DATA_0
     {0x098E, 0x4885},   // MCU_ADDRESS [CAM1_AWB_CCM_L_9]
@@ -620,8 +698,7 @@ static struct msm_camera_i2c_reg_conf mt9t113_recommend_settings_2[] = {
     {0x0990, 0x0004},   // MCU_DATA_0
 
 };
-
-static struct msm_camera_i2c_reg_conf mt9t113_recommend_settings_3[] = {
+static struct msm_camera_i2c_reg_conf mt9t113_recommend_settings_4[] = {
     {0x098E, 0x8400},      // MCU_ADDRESS
     {0x0990, 0x0006},
     {0x3ED6, 0x0F00},   // DAC_LD_10_11
@@ -886,7 +963,7 @@ static struct msm_camera_i2c_reg_conf mt9t113_recommend_settings_3[] = {
     {0x098E, 0xC90A},   // MCU_ADDRESS
     {0x0990, 0x0007},   // MCU_DATA_0
     
-    {0x326C, 0x0F0A},   // APERTURE_PARAMETERS_2D
+    {0x326C, 0x140B},   // APERTURE_PARAMETERS_2D
     {0x098E, 0xC94C},   // MCU_ADDRESS
     {0x0990, 0x0003},   // MCU_DATA_0
     {0x098E, 0xC94E},   // MCU_ADDRESS
@@ -952,7 +1029,7 @@ static struct msm_camera_i2c_reg_conf mt9t113_recommend_settings_3[] = {
     {0x0018, 0x002A},   // MCU_DATA_0	
 
 };
-static struct msm_camera_i2c_reg_conf mt9t113_recommend_settings_4[] =
+static struct msm_camera_i2c_reg_conf mt9t113_recommend_settings_3[] =
 {
      {0x098E, 0x4810},  //MCU_ADDRESS [CAM1_CTX_A_READ_MODE]
      {0x0990, 0x046F}, // MCU_DATA_0
@@ -1123,20 +1200,9 @@ static struct msm_camera_i2c_reg_conf mt9t113_effect_aqua_reg_config[] =
     {0x098E, 0x8400},
     {0x0990, 0x0006},
 };
-
-static struct msm_camera_i2c_reg_conf mt9t113_mirror_flip_reg_config[] =
-{
-     {0x098E, 0x4810},  //MCU_ADDRESS [CAM1_CTX_A_READ_MODE]
-     {0x0990, 0x046C}, // MCU_DATA_0
-     {0x098E, 0x483D}, // MCU_ADDRESS [CAM1_CTX_B_READ_MODE]
-     {0x0990, 0x0024}, // MCU_DATA_0
-     {0x098E, 0x8400}, // MCU_ADDRESS [SEQ_CMD]
-     {0x0990, 0x0006}, // MCU_DATA_0
-};
-
 static struct v4l2_subdev_info mt9t113_subdev_info[] = {
 	{
-	.code   = V4L2_MBUS_FMT_SGRBG10_1X10,
+	.code   = V4L2_MBUS_FMT_YUYV8_2X8,
 	.colorspace = V4L2_COLORSPACE_JPEG,
 	.fmt    = 1,
 	.order    = 0,
@@ -1297,41 +1363,316 @@ int32_t mt9t113_sensor_set_effect(struct msm_sensor_ctrl_t *s_ctrl, int effect)
 	return rc;
 }
 
-int32_t mt9t113_set_mirror_mode(struct msm_sensor_ctrl_t *s_ctrl)
+static int32_t mt9t113_wait(struct msm_sensor_ctrl_t *s_ctrl,  int time)
 {
-	int32_t rc=0;
-	
-	/*if needed, write the mirror registers*/
-	if (HW_MIRROR_AND_FLIP == get_hw_camera_mirror_type()) 
+	int rc = -EFAULT, count = 0;
+	unsigned short r_value = 0;
+	/*modify delays and polls after register writing*/
+	switch(time){
+		case REGISTER_WRITE_WAIT_FW:
+		{
+			/* wait for FW initialization complete
+			 * bit[14] of register 0x0018 is the STANDBY_CONTROL_AND_STATUS bit
+			 * the bit is 0 when initialization done
+			 * read the register per 5ms, timeout after 100ms
+			 */
+			for(count = 0; count < 20; count ++)
+			{
+				CDBG("time = %d, count =%d\n", time ,count);
+				rc = msm_camera_i2c_read(s_ctrl->sensor_i2c_client,0x0018, &r_value, MSM_CAMERA_I2C_WORD_DATA);
+				if(0 == (r_value & 0x4000))
+				{
+					break;
+				}
+				mdelay(5);
+			}
+		}
+			break;
+		case REGISTER_WRITE_WAIT_PATCH:
+		{
+			/* wait for Patch loading complete
+			 * variable 0x800C is the MON_RAM_PATCH_ID status
+			 * the status is 1 when initialization done
+			 * read the statue per 10ms, timeout after 200ms
+			 */
+			for(count = 0; count < 20; count ++)
+			{
+				CDBG("time = %d, count =%d,", time ,count);
+				msm_camera_i2c_write(s_ctrl->sensor_i2c_client,0x098E, 0x800C, MSM_CAMERA_I2C_WORD_DATA);
+				rc = msm_camera_i2c_read(s_ctrl->sensor_i2c_client,0x0990, &r_value,  MSM_CAMERA_I2C_WORD_DATA);
+				CDBG("====rc = %d, r_value =%d \n", rc, r_value);
+				if(1 == r_value)
+				{
+					break;
+				}
+				mdelay(10);
+			}
+		}
+			break;
+		case REGISTER_WRITE_WAIT_PREVIEW:
+		{
+			/* wait for sensor to enter the Preview mode
+			 * variable 0x8401 is the sensor MODE status
+			 * the status is 0x0003 when sensor in Preview mode
+			 * read the statue per 20ms, timeout after 300ms
+			 */
+			mdelay(30);
+			for(count = 0; count < 15; count ++)
+			{
+				printk("time = %d, count =%d,", time ,count);
+				msm_camera_i2c_write(s_ctrl->sensor_i2c_client,0x098E, 0x8401, MSM_CAMERA_I2C_WORD_DATA);
+				msm_camera_i2c_read(s_ctrl->sensor_i2c_client,0x0990, &r_value,  MSM_CAMERA_I2C_WORD_DATA);
+				printk("====rc = %d, r_value =%d \n", rc, r_value);
+				if(0x0003 == r_value)
+				{
+					rc = 0;
+					break;
+				}
+				mdelay(20);
+			}
+		}
+			break;
+		case REGISTER_WRITE_WAIT_SNAPSHOT:
+		{
+			/* wait for sensor to enter the Snapshot mode
+			 * variable 0x8401 is the sensor MODE status
+			 * the status is 0x0007 when sensor in Snapshot mode
+			 * read the statue per 20ms, timeout after 300ms
+			 */
+			mdelay(30);
+			for(count = 0; count < 15; count ++)
+			{
+				printk("time = %d, count =%d,", time ,count);
+				msm_camera_i2c_write(s_ctrl->sensor_i2c_client,0x098E, 0x8401, MSM_CAMERA_I2C_WORD_DATA);
+				rc = msm_camera_i2c_read(s_ctrl->sensor_i2c_client,0x0990, &r_value,  MSM_CAMERA_I2C_WORD_DATA);
+				printk("====rc = %d, r_value =%d \n", rc, r_value);
+				if(0x0007 == r_value)
+				{
+					rc = 0;
+					break;
+				}
+				mdelay(20);
+			}
+		}
+			break;
+		default:
+			rc = -EFAULT;
+			break;
+	}
+	return rc;
+}
+
+static int32_t mt9t113_write_init_settings(struct msm_sensor_ctrl_t *s_ctrl)
+{
+	int32_t rc=0, i;
+
+	CDBG("%s is called !\n", __func__);
+
+	for (i = 0; i < s_ctrl->msm_sensor_reg->init_size; i++)
 	{
-		printk("%s: camera need to mirror and flip here!\n", __func__);
-		rc = msm_camera_i2c_write_tbl(
+		rc = msm_sensor_write_conf_array(
 			s_ctrl->sensor_i2c_client,
-			&mt9t113_mirror_flip_reg_config[0],
-			ARRAY_SIZE(mt9t113_mirror_flip_reg_config), 
-			MSM_CAMERA_I2C_WORD_DATA);
+			s_ctrl->msm_sensor_reg->init_settings, i);
+		if(rc < 0)
+			break;
+		mt9t113_wait(s_ctrl, i);
 	}
 
 	return rc;
 }
 
-int32_t mt9t113_write_init_settings(struct msm_sensor_ctrl_t *s_ctrl)
+static int32_t mt9t113_sensor_mode_setting(struct msm_sensor_ctrl_t *s_ctrl, int res)
 {
-	int32_t rc=0, i;
-
-	/*write initialization array*/
-	for (i = 0; i < s_ctrl->msm_sensor_reg->init_size; i++) 
+	unsigned short r_value = 0;
+	int rc = 0, i;
+	/*preview setting*/
+	if (RES_PREVIEW == res)
 	{
-		rc = msm_sensor_write_conf_array(
-			s_ctrl->sensor_i2c_client, 
-			s_ctrl->msm_sensor_reg->init_settings, i);
-		if (rc < 0)
-			break;
+		CDBG("%s: sensor: init preview reg.\n", __func__);
+		msm_camera_i2c_write(s_ctrl->sensor_i2c_client,0x098E, 0x8401, MSM_CAMERA_I2C_WORD_DATA);
+		msm_camera_i2c_read(s_ctrl->sensor_i2c_client,0x0990, &r_value,  MSM_CAMERA_I2C_WORD_DATA);
+		printk("%s: r_value = %d\n", __func__, r_value);
+
+		if(0x0003 != r_value)
+		{
+			for(i=0; i < REGISTER_WRITE_RETRY; i++)
+			{
+				rc =msm_sensor_write_conf_array(s_ctrl->sensor_i2c_client, s_ctrl->msm_sensor_reg->mode_settings, res);
+				if (rc)
+				{
+					CDBG("%s: init preview reg error!!!!!!\n", __func__);
+				}
+
+				rc = mt9t113_wait(s_ctrl, REGISTER_WRITE_WAIT_PREVIEW);
+				if(!rc)
+					break;
+			}
+		}
+	}
+        /*snapshot setting*/
+	else
+	{
+		CDBG("%s: sensor: init snapshot reg.\n", __func__);
+
+		for(i=0; i < REGISTER_WRITE_RETRY; i++)
+		{
+			rc =msm_sensor_write_conf_array(s_ctrl->sensor_i2c_client, s_ctrl->msm_sensor_reg->mode_settings, res);
+			if (rc)
+			{
+				CDBG("%s: init snapshot reg error!!!!!!\n", __func__);
+			}
+
+			rc = mt9t113_wait(s_ctrl, REGISTER_WRITE_WAIT_SNAPSHOT);
+			if(!rc)
+				break;
+		}
 	}
 
-	if(rc >= 0)
-		rc = mt9t113_set_mirror_mode(s_ctrl);	
+	mdelay(5);
+	return rc;
+}
 
+static int32_t mt9t113_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
+			int update_type, int res)
+{
+	int32_t rc = 0;
+
+	if(s_ctrl->func_tbl->sensor_stop_stream)
+	{
+		s_ctrl->func_tbl->sensor_stop_stream(s_ctrl);
+	}
+	msleep(30);
+
+	if (MSM_SENSOR_REG_INIT == update_type)
+	{
+		CDBG("%s:Register INIT\n", __func__);
+
+		s_ctrl->curr_csi_params = NULL;
+		msm_sensor_enable_debugfs(s_ctrl);
+
+		if(s_ctrl->func_tbl->sensor_write_init_settings)
+		{
+			s_ctrl->func_tbl->sensor_write_init_settings(s_ctrl);
+		}
+		else
+		{
+			msm_sensor_write_init_settings(s_ctrl);
+		}
+		mt9t113_csi_config = 0;
+	}
+	else if (MSM_SENSOR_UPDATE_PERIODIC == update_type)
+	{
+		CDBG("%s:PERIODIC : %d\n", __func__, res);
+
+		mt9t113_sensor_mode_setting(s_ctrl, res);
+
+		if(!mt9t113_csi_config) {
+			s_ctrl->curr_csic_params = s_ctrl->csic_params[res];
+			v4l2_subdev_notify(&s_ctrl->sensor_v4l2_subdev,	NOTIFY_CSIC_CFG, s_ctrl->curr_csic_params);
+			CDBG("CSI config is done\n");
+			mb();
+			msleep(30);
+			mt9t113_csi_config = 1;
+		}
+
+		v4l2_subdev_notify(&s_ctrl->sensor_v4l2_subdev,	NOTIFY_PCLK_CHANGE, &s_ctrl->sensordata->pdata->ioclk.vfe_clk_rate);
+
+		if(s_ctrl->func_tbl->sensor_start_stream)
+		{
+			s_ctrl->func_tbl->sensor_start_stream(s_ctrl);
+		}
+		msleep(50);
+	}
+
+	return rc;
+}
+
+
+static int mt9t113_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
+{
+	int32_t rc = 0;
+	static struct msm_cam_clk_info clk_info[] = {
+		{"cam_clk", MSM_SENSOR_MCLK_24HZ},
+	};
+	struct msm_camera_sensor_info *data = s_ctrl->sensordata;
+
+	CDBG("%s: %d\n", __func__, __LINE__);
+	s_ctrl->reg_ptr = kzalloc(sizeof(struct regulator *)
+			* data->sensor_platform_info->num_vreg, GFP_KERNEL);
+	if (!s_ctrl->reg_ptr) {
+		pr_err("%s: could not allocate mem for regulators\n",
+			__func__);
+		return -ENOMEM;
+	}
+
+	rc = msm_camera_request_gpio_table(data, 1);
+	if (rc < 0) {
+		pr_err("%s: request gpio failed\n", __func__);
+		goto request_gpio_failed;
+	}
+
+	rc = msm_camera_config_vreg(&s_ctrl->sensor_i2c_client->client->dev,
+		s_ctrl->sensordata->sensor_platform_info->cam_vreg,
+		s_ctrl->sensordata->sensor_platform_info->num_vreg,
+		s_ctrl->reg_ptr, 1);
+	if (rc < 0) {
+		pr_err("%s: regulator on failed\n", __func__);
+		goto config_vreg_failed;
+	}
+
+	rc = msm_camera_enable_vreg(&s_ctrl->sensor_i2c_client->client->dev,
+			s_ctrl->sensordata->sensor_platform_info->cam_vreg,
+			s_ctrl->sensordata->sensor_platform_info->num_vreg,
+			s_ctrl->reg_ptr, 1);
+	if (rc < 0) {
+		pr_err("%s: enable regulator failed\n", __func__);
+		goto enable_vreg_failed;
+	}
+
+	/*the delay between VDD and MCLK*/
+	usleep_range(50*1000, 55*1000);
+
+	if (s_ctrl->clk_rate != 0)
+		clk_info->clk_rate = s_ctrl->clk_rate;
+	rc = msm_cam_clk_enable(&s_ctrl->sensor_i2c_client->client->dev,
+		clk_info, &s_ctrl->cam_clk, ARRAY_SIZE(clk_info), 1);
+	if (rc < 0) {
+		pr_err("%s: clk enable failed\n", __func__);
+		goto enable_clk_failed;
+	}
+
+	rc = msm_camera_config_gpio_table(data, 1);
+	if (rc < 0) {
+		pr_err("%s: config gpio failed\n", __func__);
+		goto config_gpio_failed;
+	}
+
+	if (data->sensor_platform_info->ext_power_ctrl != NULL)
+		data->sensor_platform_info->ext_power_ctrl(1);
+
+	if (data->sensor_platform_info->i2c_conf &&
+		data->sensor_platform_info->i2c_conf->use_i2c_mux)
+		msm_sensor_enable_i2c_mux(data->sensor_platform_info->i2c_conf);
+
+	return rc;
+
+config_gpio_failed:
+	msm_cam_clk_enable(&s_ctrl->sensor_i2c_client->client->dev,
+		clk_info, &s_ctrl->cam_clk, ARRAY_SIZE(clk_info), 0);
+enable_clk_failed:
+	msm_camera_enable_vreg(&s_ctrl->sensor_i2c_client->client->dev,
+		s_ctrl->sensordata->sensor_platform_info->cam_vreg,
+		s_ctrl->sensordata->sensor_platform_info->num_vreg,
+		s_ctrl->reg_ptr, 0);
+enable_vreg_failed:
+	msm_camera_config_vreg(&s_ctrl->sensor_i2c_client->client->dev,
+		s_ctrl->sensordata->sensor_platform_info->cam_vreg,
+		s_ctrl->sensordata->sensor_platform_info->num_vreg,
+		s_ctrl->reg_ptr, 0);
+config_vreg_failed:
+	msm_camera_request_gpio_table(data, 0);
+request_gpio_failed:
+	kfree(s_ctrl->reg_ptr);
 	return rc;
 }
 
@@ -1380,16 +1721,16 @@ static struct msm_sensor_fn_t mt9t113_func_tbl = {
 	.sensor_group_hold_off = msm_sensor_group_hold_off,
 	.sensor_write_exp_gain = mt9t113_write_prev_exp_gain,
 	.sensor_write_snapshot_exp_gain = mt9t113_write_pict_exp_gain,
-	.sensor_csi_setting = msm_sensor_setting1,
+	.sensor_csi_setting = mt9t113_sensor_setting,
+	.sensor_write_init_settings = mt9t113_write_init_settings,
 	.sensor_set_sensor_mode = msm_sensor_set_sensor_mode,
 	.sensor_mode_init = msm_sensor_mode_init,
 	.sensor_get_output_info = msm_sensor_get_output_info,
 	.sensor_config = msm_sensor_config,
-	.sensor_power_up = msm_sensor_power_up,
+	.sensor_power_up = mt9t113_sensor_power_up,
 	.sensor_power_down = msm_sensor_power_down,
 	.sensor_set_wb = mt9t113_sensor_set_wb,
 	.sensor_set_effect = mt9t113_sensor_set_effect,
-	.sensor_write_init_settings = mt9t113_write_init_settings,
 };
 
 static struct msm_sensor_reg_t mt9t113_regs = {
@@ -1418,7 +1759,7 @@ static struct msm_sensor_ctrl_t mt9t113_s_ctrl = {
 	.sensor_v4l2_subdev_info_size = ARRAY_SIZE(mt9t113_subdev_info),
 	.sensor_v4l2_subdev_ops = &mt9t113_subdev_ops,
 	.func_tbl = &mt9t113_func_tbl,
-	.clk_rate = MSM_SENSOR_MCLK_24HZ,
+	.clk_rate = MSM_SENSOR_MCLK_48HZ,
 	.sensor_name = "23060073FF-MT-B",
 };
 

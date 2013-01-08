@@ -3,21 +3,11 @@
  *
  * Copyright (C) 2006-2007 Renesas Solutions Corp.
  *
- * Author : Yoshihiro Shimoda <shimoda.yoshihiro@renesas.com>
+ * Author : Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; version 2 of the License.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
  */
 
 #include <linux/module.h>
@@ -370,7 +360,7 @@ static void m66592_ep_setting(struct m66592 *m66592, struct m66592_ep *ep,
 
 	ep->pipectr = get_pipectr_addr(pipenum);
 	ep->pipenum = pipenum;
-	ep->ep.maxpacket = le16_to_cpu(desc->wMaxPacketSize);
+	ep->ep.maxpacket = usb_endpoint_maxp(desc);
 	m66592->pipenum2ep[pipenum] = ep;
 	m66592->epaddr2ep[desc->bEndpointAddress&USB_ENDPOINT_NUMBER_MASK] = ep;
 	INIT_LIST_HEAD(&ep->queue);
@@ -447,7 +437,7 @@ static int alloc_pipe_config(struct m66592_ep *ep,
 	ep->type = info.type;
 
 	info.epnum = desc->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
-	info.maxpacket = le16_to_cpu(desc->wMaxPacketSize);
+	info.maxpacket = usb_endpoint_maxp(desc);
 	info.interval = desc->bInterval;
 	if (desc->bEndpointAddress & USB_ENDPOINT_DIR_MASK)
 		info.dir_in = 1;
@@ -691,6 +681,7 @@ static void init_controller(struct m66592 *m66592)
 
 static void disable_controller(struct m66592 *m66592)
 {
+	m66592_bclr(m66592, M66592_UTST, M66592_TESTMODE);
 	if (!m66592->pdata->on_chip) {
 		m66592_bclr(m66592, M66592_SCKE, M66592_SYSCFG);
 		udelay(1);
@@ -780,7 +771,7 @@ static void irq_ep0_write(struct m66592_ep *ep, struct m66592_request *req)
 	/* write fifo */
 	if (req->req.buf) {
 		if (size > 0)
-			m66592_write_fifo(m66592, ep->fifoaddr, buf, size);
+			m66592_write_fifo(m66592, ep, buf, size);
 		if ((size == 0) || ((size % ep->ep.maxpacket) != 0))
 			m66592_bset(m66592, M66592_BVAL, ep->fifoctr);
 	}
@@ -826,7 +817,7 @@ static void irq_packet_write(struct m66592_ep *ep, struct m66592_request *req)
 
 	/* write fifo */
 	if (req->req.buf) {
-		m66592_write_fifo(m66592, ep->fifoaddr, buf, size);
+		m66592_write_fifo(m66592, ep, buf, size);
 		if ((size == 0)
 				|| ((size % ep->ep.maxpacket) != 0)
 				|| ((bufsize != ep->ep.maxpacket)
@@ -1048,10 +1039,30 @@ static void clear_feature(struct m66592 *m66592, struct usb_ctrlrequest *ctrl)
 
 static void set_feature(struct m66592 *m66592, struct usb_ctrlrequest *ctrl)
 {
+	u16 tmp;
+	int timeout = 3000;
 
 	switch (ctrl->bRequestType & USB_RECIP_MASK) {
 	case USB_RECIP_DEVICE:
-		control_end(m66592, 1);
+		switch (le16_to_cpu(ctrl->wValue)) {
+		case USB_DEVICE_TEST_MODE:
+			control_end(m66592, 1);
+			/* Wait for the completion of status stage */
+			do {
+				tmp = m66592_read(m66592, M66592_INTSTS0) &
+								M66592_CTSQ;
+				udelay(1);
+			} while (tmp != M66592_CS_IDST || timeout-- > 0);
+
+			if (tmp == M66592_CS_IDST)
+				m66592_bset(m66592,
+					    le16_to_cpu(ctrl->wIndex >> 8),
+					    M66592_TESTMODE);
+			break;
+		default:
+			pipe_stall(m66592, 0);
+			break;
+		}
 		break;
 	case USB_RECIP_INTERFACE:
 		control_end(m66592, 1);
@@ -1461,7 +1472,7 @@ static int m66592_start(struct usb_gadget_driver *driver,
 	int retval;
 
 	if (!driver
-			|| driver->speed != USB_SPEED_HIGH
+			|| driver->max_speed < USB_SPEED_HIGH
 			|| !bind
 			|| !driver->setup)
 		return -EINVAL;
@@ -1540,10 +1551,26 @@ static int m66592_get_frame(struct usb_gadget *_gadget)
 	return m66592_read(m66592, M66592_FRMNUM) & 0x03FF;
 }
 
+static int m66592_pullup(struct usb_gadget *gadget, int is_on)
+{
+	struct m66592 *m66592 = gadget_to_m66592(gadget);
+	unsigned long flags;
+
+	spin_lock_irqsave(&m66592->lock, flags);
+	if (is_on)
+		m66592_bset(m66592, M66592_DPRPU, M66592_SYSCFG);
+	else
+		m66592_bclr(m66592, M66592_DPRPU, M66592_SYSCFG);
+	spin_unlock_irqrestore(&m66592->lock, flags);
+
+	return 0;
+}
+
 static struct usb_gadget_ops m66592_gadget_ops = {
 	.get_frame		= m66592_get_frame,
 	.start			= m66592_start,
 	.stop			= m66592_stop,
+	.pullup			= m66592_pullup,
 };
 
 static int __exit m66592_remove(struct platform_device *pdev)
@@ -1626,7 +1653,7 @@ static int __init m66592_probe(struct platform_device *pdev)
 	m66592->gadget.ops = &m66592_gadget_ops;
 	device_initialize(&m66592->gadget.dev);
 	dev_set_name(&m66592->gadget.dev, "gadget");
-	m66592->gadget.is_dualspeed = 1;
+	m66592->gadget.max_speed = USB_SPEED_HIGH;
 	m66592->gadget.dev.parent = &pdev->dev;
 	m66592->gadget.dev.dma_mask = pdev->dev.dma_mask;
 	m66592->gadget.dev.release = pdev->dev.release;
@@ -1637,7 +1664,7 @@ static int __init m66592_probe(struct platform_device *pdev)
 	m66592->timer.data = (unsigned long)m66592;
 	m66592->reg = reg;
 
-	ret = request_irq(ires->start, m66592_irq, IRQF_DISABLED | IRQF_SHARED,
+	ret = request_irq(ires->start, m66592_irq, IRQF_SHARED,
 			udc_name, m66592);
 	if (ret < 0) {
 		pr_err("request_irq error (%d)\n", ret);

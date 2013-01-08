@@ -12,7 +12,7 @@
  */
 
 #include <linux/regulator/pm8xxx-regulator.h>
-#include <linux/regulator/gpio-regulator.h>
+#include <linux/regulator/msm-gpio-regulator.h>
 #include <mach/rpm-regulator.h>
 
 #include "board-9615.h"

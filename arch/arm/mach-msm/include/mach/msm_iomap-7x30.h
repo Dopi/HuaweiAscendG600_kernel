@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2008-2010, 2012 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2012 Code Aurora Forum. All rights reserved.
  * Author: Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -82,5 +82,9 @@
 
 #define MSM7X30_AD5_PHYS		0xA7000000
 #define MSM7X30_AD5_SIZE		(SZ_1M*13)
+
+#ifndef __ASSEMBLY__
+extern void msm_map_msm7x30_io(void);
+#endif
 
 #endif

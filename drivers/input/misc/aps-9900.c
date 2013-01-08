@@ -201,7 +201,6 @@ static int aps_9900_open(struct inode *inode, struct file *file)
         /*it's not necessary to set this flag everytime*/
         /*aps_first_read = 1;*/
     }
-
     if( proximity_device_minor == iminor(inode) ){
         PROXIMITY_DEBUG("%s:proximity_device_minor == iminor(inode)\n", __func__);
         wake_lock( &proximity_wake_lock);
@@ -209,7 +208,6 @@ static int aps_9900_open(struct inode *inode, struct file *file)
         input_report_abs(this_aps_data->input_dev, ABS_DISTANCE, 1);
         input_sync(this_aps_data->input_dev);
     }
-    APS9900_DBG(KERN_ERR "%s:flag is %d\n", __func__,aps_open_flag);
     /* when open_count come to max, the aps device reset the value of min_proximity_value*/
     if( OPEN_COUNT_MAX == open_count )
     {
@@ -217,6 +215,7 @@ static int aps_9900_open(struct inode *inode, struct file *file)
         open_count = 0;
     }
     open_count ++;
+    APS9900_DBG(KERN_ERR "%s:flag is %d,open_count = %d\n", __func__,aps_open_flag,open_count);
     if(p_h != get_9900_register(this_aps_data, APDS9900_PIHTL_REG, 1) \
      ||p_l != get_9900_register(this_aps_data, APDS9900_PILTL_REG, 1) )
     {
@@ -842,9 +841,7 @@ static int aps_9900_probe(
     /* add U8825 & 8825D proximit and ambient  parameters */
     else if( machine_is_msm8x25_U8825()
         || machine_is_msm8x25_U8825D()
-        || machine_is_msm8x25_U8833D()
-        || machine_is_msm8x25_U8833()
-        || machine_is_msm8x25_C8951()
+        /*delete G510 Y300*/
         || machine_is_msm8x25_C8825D())
     {
         apds_9900_pwindows_value = CU8825_WINDOW;
@@ -865,6 +862,42 @@ static int aps_9900_probe(
         apds_9900_pwindows_value = CU8950_WINDOW;
         apds_9900_pwave_value = CU8950_WAVE; 
         p = &lsensor_adc_table_cu8950[0];
+    }
+    /*G510C*/
+    else if( machine_is_msm8x25_C8813() )
+    {
+        apds_9900_pwindows_value = G510C_WINDOW;
+        apds_9900_pwave_value = G510C_WAVE; 
+        p = &lsensor_adc_table_g510c[0];	
+    }
+    /*G510*/
+    else if( machine_is_msm8x25_U8951D()
+        || machine_is_msm8x25_U8951()
+        /* move C8813 to above */
+        )
+    {
+        apds_9900_pwindows_value = G510_WINDOW;
+        apds_9900_pwave_value = G510_WAVE; 
+        p = &lsensor_adc_table_g510[0];	
+        aps9900_init_regdata[PPCOUNT_REG_INDEX].data = 0x0C;
+    }
+    /*Y300*/
+    else if( machine_is_msm8x25_C8833D()
+        || machine_is_msm8x25_U8833D()
+        || machine_is_msm8x25_U8833() )
+    {
+        apds_9900_pwindows_value = Y300_WINDOW;
+        apds_9900_pwave_value = Y300_WAVE; 
+        p = &lsensor_adc_table_y300[0];
+        aps9900_init_regdata[PPCOUNT_REG_INDEX].data = 0x0A;
+    }
+    else if( machine_is_msm7x27a_H867G() 
+          || machine_is_msm7x27a_H868C())
+    {
+        apds_9900_pwindows_value = H867G_WINDOW;
+        apds_9900_pwave_value = H867G_WAVE;
+        aps9900_init_regdata[4].data = 8; //to increase the sensor sensitivity
+        p = &lsensor_adc_table_H867G[0];
     }
     else
     {

@@ -45,6 +45,16 @@ config HUAWEI_CAMERA_SENSOR_MT9V113
 	default n
 	help
 	if Y ,select HUAWEI_CAMERA_SENSOR_MT9V113
+config HUAWEI_CAMERA_SENSOR_GC0313
+	tristate "gc0313 is used"
+	default n
+	help
+	if Y ,select HUAWEI_CAMERA_SENSOR_GC0313
+config HUAWEI_CAMERA_SENSOR_BF3905
+	tristate "bf3905 is used"
+	default n
+	help
+	if Y ,select HUAWEI_CAMERA_SENSOR_BF3905
 config MT9D112
 	bool "Sensor mt9d112 (YUV 2M)"
 	depends on MSM_CAMERA && !ARCH_MSM8X60 && !ARCH_MSM8960 && !MSM_CAMERA_V4L2
@@ -276,6 +286,15 @@ config HUAWEI_CAMERA_SENSOR_S5K3H2
 	  It is a Bayer 8MP sensor with auto focus and it supports
 	  two mipi lanes, required for msm7x2xA platform.
 	  Say Y here if this is msm7x2xA variant platform.
+config HUAWEI_CAMERA_SENSOR_HI542
+	bool "Sensor hi542 (SUNNY 5M)"
+	depends on MSM_CAMERA
+	default n
+	---help---
+	  Support for HI542 sunny sensor driver.
+	  It is a Bayer 5MP sensor without auto focus and it supports
+	  two mipi lanes, required for msm8x25 platform.
+	  Say Y here if this is msm8x25 variant platform.
 config DW9712_ACT
 	bool "Lens actuator dw9721"
 	depends on MSM_CAMERA && S5K4E1

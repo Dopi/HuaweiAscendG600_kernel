@@ -457,6 +457,8 @@ static void msm_batt_update_psy_status(void)
 	u32	battery_temp;
 	struct	power_supply	*supp;
 
+	pr_info("%s: enter\n", __func__);
+
 	if (msm_batt_get_batt_chg_status())
 		return;
 
@@ -483,15 +485,14 @@ static void msm_batt_update_psy_status(void)
 		 * Nothing changed in Battery or charger status.
 		 */
 		unnecessary_event_count++;
-		if ((unnecessary_event_count % 20) == 1)
-			DBG_LIMIT("BATT: same event count = %u\n",
-				 unnecessary_event_count);
+		pr_info("BATT: same event count = %u\n",
+			 unnecessary_event_count);
 		return;
 	}
 
 	unnecessary_event_count = 0;
 
-	DBG_LIMIT("BATT: rcvd: %d, %d, %d, %d; %d, %d\n",
+	pr_info("BATT: rcvd: %d, %d, %d, %d; %d, %d\n",
 		 charger_status, charger_type, battery_status,
 		 battery_level, battery_voltage, battery_temp);
 
@@ -650,6 +651,8 @@ static void msm_batt_update_psy_status(void)
 		DBG_LIMIT("BATT: Supply = %s\n", supp->name);
 		power_supply_changed(supp);
 	}
+
+	pr_info("%s: exit\n", __func__);
 }
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -1405,8 +1408,10 @@ static int __devinit msm_batt_probe(struct platform_device *pdev)
 	msm_batt_info.msm_psy_batt = &msm_psy_batt;
 
 #ifndef CONFIG_BATTERY_MSM_FAKE
-	rc = msm_batt_register(BATTERY_LOW, BATTERY_ALL_ACTIVITY,
-			       BATTERY_CB_ID_ALL_ACTIV, BATTERY_ALL_ACTIVITY);
+	rc = msm_batt_register(msm_batt_info.voltage_fail_safe,
+			       BATTERY_ALL_ACTIVITY,
+			       BATTERY_CB_ID_ALL_ACTIV,
+			       BATTERY_ALL_ACTIVITY);
 	if (rc < 0) {
 		dev_err(&pdev->dev,
 			"%s: msm_batt_register failed rc = %d\n", __func__, rc);

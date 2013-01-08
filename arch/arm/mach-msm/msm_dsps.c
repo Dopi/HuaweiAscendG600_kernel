@@ -45,9 +45,8 @@
 #include "timer.h"
 
 #define DRV_NAME	"msm_dsps"
-#define DRV_VERSION	"4.01"
+#define DRV_VERSION	"4.02"
 
-#define PPSS_PAUSE_REG	0x1804
 
 #define PPSS_TIMER0_32KHZ_REG	0x1004
 #define PPSS_TIMER0_20MHZ_REG	0x0804
@@ -137,23 +136,29 @@ static void dsps_unload(void)
 
 /**
  *  Suspend DSPS CPU.
+ *
+ * Only call if dsps_pwr_ctl_en is false.
+ * If dsps_pwr_ctl_en is true, then DSPS will control its own power state.
  */
 static void dsps_suspend(void)
 {
 	pr_debug("%s.\n", __func__);
 
-	writel_relaxed(1, drv->ppss_base + PPSS_PAUSE_REG);
+	writel_relaxed(1, drv->ppss_base + drv->pdata->ppss_pause_reg);
 	mb(); /* Make sure write commited before ioctl returns. */
 }
 
 /**
  *  Resume DSPS CPU.
+ *
+ * Only call if dsps_pwr_ctl_en is false.
+ * If dsps_pwr_ctl_en is true, then DSPS will control its own power state.
  */
 static void dsps_resume(void)
 {
 	pr_debug("%s.\n", __func__);
 
-	writel_relaxed(0, drv->ppss_base + PPSS_PAUSE_REG);
+	writel_relaxed(0, drv->ppss_base + drv->pdata->ppss_pause_reg);
 	mb(); /* Make sure write commited before ioctl returns. */
 }
 
@@ -226,7 +231,7 @@ static int dsps_power_on_handler(void)
 
 		}
 
-		ret = clk_enable(clock);
+		ret = clk_prepare_enable(clock);
 		if (ret) {
 			pr_err("%s: enable clk %s err %d.",
 			       __func__, name, ret);
@@ -315,7 +320,7 @@ clk_err:
 		if (clock == NULL)
 			continue;
 
-		clk_disable(clock);
+		clk_disable_unprepare(clock);
 	}
 
 	return -ENODEV;
@@ -345,7 +350,7 @@ static int dsps_power_off_handler(void)
 			const char *name = drv->pdata->clks[i].name;
 
 			pr_debug("%s: set clk %s off.", __func__, name);
-			clk_disable(drv->pdata->clks[i].clock);
+			clk_disable_unprepare(drv->pdata->clks[i].clock);
 		}
 
 	for (i = 0; i < drv->pdata->regs_num; i++)
@@ -425,8 +430,10 @@ static long dsps_ioctl(struct file *file,
 
 	switch (cmd) {
 	case DSPS_IOCTL_ON:
-		ret = dsps_power_on_handler();
-		dsps_resume();
+		if (!drv->pdata->dsps_pwr_ctl_en) {
+			ret = dsps_power_on_handler();
+			dsps_resume();
+		}
 		break;
 	case DSPS_IOCTL_OFF:
 		if (!drv->pdata->dsps_pwr_ctl_en) {
@@ -567,7 +574,7 @@ static int dsps_alloc_resources(struct platform_device *pdev)
 
 	drv->smem_ramdump_segments[0].address = drv->pdata->smem_start;
 	drv->smem_ramdump_segments[0].size =  drv->pdata->smem_size;
-	drv->smem_ramdump_dev = create_ramdump_device("smem");
+	drv->smem_ramdump_dev = create_ramdump_device("smem-dsps");
 	if (!drv->smem_ramdump_dev) {
 		pr_err("%s: create_ramdump_device(\"smem\") fail\n",
 		       __func__);
@@ -634,7 +641,8 @@ static int dsps_open(struct inode *ip, struct file *fp)
 			return ret;
 		}
 
-		dsps_resume();
+		if (!drv->pdata->dsps_pwr_ctl_en)
+			dsps_resume();
 	}
 	drv->ref_count++;
 
@@ -761,7 +769,6 @@ static int dsps_shutdown(const struct subsys_data *subsys)
 {
 	pr_debug("%s\n", __func__);
 	disable_irq_nosync(drv->wdog_irq);
-	dsps_suspend();
 	pil_force_shutdown(drv->pdata->pil_name);
 	dsps_power_off_handler();
 	return 0;
@@ -779,7 +786,6 @@ static int dsps_powerup(const struct subsys_data *subsys)
 	pil_force_boot(drv->pdata->pil_name);
 	atomic_set(&drv->crash_in_progress, 0);
 	enable_irq(drv->wdog_irq);
-	dsps_resume();
 	return 0;
 }
 

@@ -13,6 +13,7 @@
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
 
+#include <linux/export.h>
 #include <linux/err.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>

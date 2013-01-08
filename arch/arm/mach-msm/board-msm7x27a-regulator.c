@@ -11,6 +11,7 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/kernel.h>
 #include "board-msm7x27a-regulator.h"
 
 #define VOLTAGE_RANGE(min_uV, max_uV, step_uV)	((max_uV - min_uV) / step_uV)
@@ -233,8 +234,8 @@ static struct proccomm_regulator_info msm7x27a_pcom_vreg_info[] = {
 	PCOM_VREG_LDO(ldo14, 16, NULL, 3300000, 3300000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo15, 54, NULL, 1800000, 2850000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo16, 19, NULL, 1800000, 2850000, 0, -1, 0, 0, 0, 0, p),
-        PCOM_VREG_LDO(ldo17, 56, NULL, 2850000, 3300000, 0, -1, 0, 0, 0, 0, p),
-        PCOM_VREG_LDO(ldo18, 11, NULL, 2700000, 2700000, 0, -1, 0, 0, 0, 0, p),
+	PCOM_VREG_LDO(ldo17, 56, NULL,  2850000,  3300000, 0, -1, 0, 0, 0, 0, p),
+	PCOM_VREG_LDO(ldo18, 11, NULL, 2700000, 2700000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo19, 57, NULL, 1200000, 1800000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_NCP(ncp,   31, NULL, -1800000, -1800000, 0,     0, 0, 0, 0),
 };

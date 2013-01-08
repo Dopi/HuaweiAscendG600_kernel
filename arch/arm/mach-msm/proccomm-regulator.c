@@ -21,7 +21,7 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
-#include "proc_comm.h"
+#include <mach/proc_comm.h>
 #include "proccomm-regulator.h"
 
 #define MV_TO_UV(mv) ((mv)*1000)

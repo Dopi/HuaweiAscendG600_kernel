@@ -13,10 +13,12 @@
 #ifndef MSM_SENSOR_H
 #define MSM_SENSOR_H
 
+#include <linux/module.h>
 #include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/miscdevice.h>
+#include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/types.h>
@@ -39,6 +41,8 @@
 
 #define CAMERA_NAME_LEN 128  //this size is same with CAMERA_NAME_LEN in board_msm7627a_camera.c
 extern int is_first_preview_frame ;
+extern int csi_config;
+extern bool standby_mode;
 enum msm_sensor_reg_update {
 	/* Sensor egisters that need to be updated during initialization */
 	MSM_SENSOR_REG_INIT,
@@ -139,14 +143,21 @@ struct msm_sensor_fn_t {
 		(struct msm_sensor_ctrl_t *);
 	int (*sensor_power_up) (struct msm_sensor_ctrl_t *);
 	int32_t (*sensor_match_id)(struct msm_sensor_ctrl_t *s_ctrl);
+	int (*sensor_adjust_frame_lines)
+		(struct msm_sensor_ctrl_t *s_ctrl, uint16_t res);
+	int32_t (*sensor_get_csi_params)(struct msm_sensor_ctrl_t *,
+		struct csi_lane_params_t *);
 	int32_t (*sensor_write_init_settings)(struct msm_sensor_ctrl_t *s_ctrl);
 	int32_t (*sensor_model_match)(struct msm_sensor_ctrl_t *s_ctrl);
 	int32_t (*sensor_set_wb)(struct msm_sensor_ctrl_t *, int);
 	int32_t (*sensor_set_effect)(struct msm_sensor_ctrl_t *, int);
-	int (*sensor_adjust_frame_lines)
-		(struct msm_sensor_ctrl_t *s_ctrl, uint16_t res);
     int (*sensor_otp_reading)(struct sensor_cfg_data *cfg);
     void (*sensor_mclk_self_adapt)(struct msm_sensor_ctrl_t *);
+};
+
+struct msm_sensor_csi_info {
+	uint32_t csid_version;
+	uint8_t is_csic;
 };
 
 struct msm_sensor_ctrl_t {
@@ -162,6 +173,8 @@ struct msm_sensor_ctrl_t {
 	struct msm_sensor_reg_t *msm_sensor_reg;
 	struct msm_sensor_v4l2_ctrl_info_t *msm_sensor_v4l2_ctrl_info;
 	uint16_t num_v4l2_ctrl;
+	uint32_t csid_version;
+	uint8_t is_csic;
 
 	uint16_t curr_line_length_pclk;
 	uint16_t curr_frame_length_lines;
@@ -193,6 +206,7 @@ void msm_sensor_start_stream(struct msm_sensor_ctrl_t *s_ctrl);
 void msm_sensor_stop_stream(struct msm_sensor_ctrl_t *s_ctrl);
 void msm_sensor_group_hold_on(struct msm_sensor_ctrl_t *s_ctrl);
 void msm_sensor_group_hold_off(struct msm_sensor_ctrl_t *s_ctrl);
+int32_t msm_sensor_enable_i2c_mux(struct msm_camera_i2c_conf *i2c_conf);
 
 int32_t msm_sensor_set_fps(struct msm_sensor_ctrl_t *s_ctrl,
 			struct fps_cfg   *fps);
@@ -252,16 +266,18 @@ int msm_sensor_enable_debugfs(struct msm_sensor_ctrl_t *s_ctrl);
 long msm_sensor_subdev_ioctl(struct v4l2_subdev *sd,
 			unsigned int cmd, void *arg);
 
-struct msm_sensor_ctrl_t *get_sctrl(struct v4l2_subdev *sd);
+int32_t msm_sensor_get_csi_params(struct msm_sensor_ctrl_t *s_ctrl,
+		struct csi_lane_params_t *sensor_output_info);
 
-#if defined(CONFIG_OV5647)
-	extern int lcd_camera_power_onoff(int on);
-#endif
+struct msm_sensor_ctrl_t *get_sctrl(struct v4l2_subdev *sd);
 
 #define VIDIOC_MSM_SENSOR_CFG \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 10, void __user *)
 
 #define VIDIOC_MSM_SENSOR_RELEASE \
 	_IO('V', BASE_VIDIOC_PRIVATE + 11)
+
+#define VIDIOC_MSM_SENSOR_CSID_INFO\
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 12, struct msm_sensor_csi_info *)
 
 #endif

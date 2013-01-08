@@ -17,6 +17,7 @@
 #define LCD_DEVICE_NAME "mipi_cmd_nt35516_qhd_pt"
 
 static lcd_panel_type lcd_panel_qhd = LCD_NONE;
+/* reduce the rate of mipi transmit */
 static struct mipi_dsi_phy_ctrl dsi_cmd_mode_phy_db = {
 	/* DSI Bit Clock at 419 MHz, 2 lane, RGB888 */
 	/* regulator */
@@ -804,10 +805,11 @@ static int mipi_nt35516_lcd_on(struct platform_device *pdev)
     }
 	else
 	{
-		//mipi_set_tx_power_mode(1);
+		/* change mipi transmit mode to low power when load sequences */
+		mipi_set_tx_power_mode(1);
 		process_mipi_table(mfd,&nt35516_tx_buf,(struct sequence*)&nt35516_hvga_standby_exit_table,
 		 	ARRAY_SIZE(nt35516_hvga_standby_exit_table), lcd_panel_qhd);
-		//mipi_set_tx_power_mode(0);
+		mipi_set_tx_power_mode(0);
 		/*delete some lines */
 	}
 
@@ -941,8 +943,8 @@ static int mipi_cmd_nt35516_qhd_pt_init(void)
 	struct msm_panel_info *pinfo = NULL;
 	
 	lcd_panel_qhd = get_lcd_panel_type();
-	if (MIPI_NT35516_TIANMA_QHD != lcd_panel_qhd &&
-		MIPI_NT35516_CHIMEI_QHD != lcd_panel_qhd)
+	if (MIPI_CMD_NT35516_TIANMA_QHD != lcd_panel_qhd &&
+		MIPI_CMD_NT35516_CHIMEI_QHD != lcd_panel_qhd)
 	{
 		return 0;
 	}
@@ -962,6 +964,8 @@ static int mipi_cmd_nt35516_qhd_pt_init(void)
 		pinfo->bl_max = 255;
 		pinfo->bl_min = 30;		
 		pinfo->fb_num = 3;
+		/* increase the rate of mipi transmit */
+		/* reduce the rate of mipi transmit */
 		pinfo->clk_rate = 419000000;
 		pinfo->lcd.refx100 = 6000; /* adjust refx100 to prevent tearing */
 

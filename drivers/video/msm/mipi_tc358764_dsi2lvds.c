@@ -281,8 +281,8 @@ static int mipi_d2l_write_reg(struct msm_fb_data_type *mfd, u16 reg, u32 data)
 	payload.addr = reg;
 	payload.data = data;
 
-	/* mutex had been acquired at mipi_dsi_on */
-	mipi_dsi_cmds_tx(mfd, &d2l_tx_buf, &cmd_write_reg, 1);
+	/* mutex had been acquried at dsi_on */
+	mipi_dsi_cmds_tx(&d2l_tx_buf, &cmd_write_reg, 1);
 
 	pr_debug("%s: reg=0x%x. data=0x%x.\n", __func__, reg, data);
 
@@ -574,7 +574,8 @@ static int mipi_d2l_lcd_on(struct platform_device *pdev)
 	mipi_d2l_enable_3d(mfd, false, false);
 
 	/* Add I2C driver only after DSI-CLK is running */
-	i2c_add_driver(&d2l_i2c_slave_driver);
+	if (d2l_i2c_client == NULL)
+		i2c_add_driver(&d2l_i2c_slave_driver);
 
 	pr_info("%s.ret=%d.\n", __func__, ret);
 
@@ -988,6 +989,8 @@ static struct platform_driver d2l_driver = {
 static int mipi_d2l_init(void)
 {
 	pr_debug("%s.\n", __func__);
+
+	d2l_i2c_client = NULL;
 
 	return platform_driver_register(&d2l_driver);
 }

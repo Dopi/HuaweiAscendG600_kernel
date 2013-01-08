@@ -52,7 +52,7 @@ struct msmusb_hcd {
 	unsigned int clk_enabled;
 	struct msm_usb_host_platform_data *pdata;
 	unsigned running;
-	struct otg_transceiver *xceiv;
+	struct usb_phy *xceiv;
 	struct work_struct otg_work;
 	unsigned flags;
 	struct msm_otg_ops otg_ops;
@@ -270,7 +270,7 @@ static void usb_lpm_exit(struct usb_hcd *hcd)
 static irqreturn_t ehci_msm_irq(struct usb_hcd *hcd)
 {
 	struct msmusb_hcd *mhcd = hcd_to_mhcd(hcd);
-	struct msm_otg *otg = container_of(mhcd->xceiv, struct msm_otg, otg);
+	struct msm_otg *otg = container_of(mhcd->xceiv, struct msm_otg, phy);
 
 	/*
 	 * OTG scheduled a work to get Integrated PHY out of LPM,
@@ -296,7 +296,7 @@ static int ehci_msm_bus_suspend(struct usb_hcd *hcd)
 		return ret;
 	}
 	if (PHY_TYPE(mhcd->pdata->phy_info) == USB_PHY_INTEGRATED)
-		ret = otg_set_suspend(mhcd->xceiv, 1);
+		ret = usb_phy_set_suspend(mhcd->xceiv, 1);
 	else
 		ret = usb_lpm_enter(hcd);
 
@@ -316,7 +316,7 @@ static int ehci_msm_bus_resume(struct usb_hcd *hcd)
 	pm_runtime_resume(dev);
 
 	if (PHY_TYPE(mhcd->pdata->phy_info) == USB_PHY_INTEGRATED) {
-		otg_set_suspend(mhcd->xceiv, 0);
+		usb_phy_set_suspend(mhcd->xceiv, 0);
 	} else { /* PMIC serial phy */
 		usb_lpm_exit(hcd);
 		if (cancel_work_sync(&(mhcd->lpm_exit_work)))
@@ -399,7 +399,7 @@ static int ehci_msm_run(struct usb_hcd *hcd)
 	ehci_writel(ehci, ehci->command, &ehci->regs->command);
 	ehci_readl(ehci, &ehci->regs->command); /* unblock posted writes */
 
-	hcd->state = HC_STATE_RUNNING;
+	ehci->rh_state = EHCI_RH_RUNNING;
 
 	/*Enable appropriate Interrupts*/
 	ehci_writel(ehci, INTR_MASK, &ehci->regs->intr_enable);
@@ -453,7 +453,7 @@ static void msm_hsusb_request_host(void *handle, int request)
 	struct msmusb_hcd *mhcd = handle;
 	struct usb_hcd *hcd = mhcd_to_hcd(mhcd);
 	struct msm_usb_host_platform_data *pdata = mhcd->pdata;
-	struct msm_otg *otg = container_of(mhcd->xceiv, struct msm_otg, otg);
+	struct msm_otg *otg = container_of(mhcd->xceiv, struct msm_otg, phy);
 #ifdef CONFIG_USB_OTG
 	struct usb_device *udev = hcd->self.root_hub;
 #endif
@@ -626,14 +626,14 @@ static int msm_xusb_init_host(struct platform_device *pdev,
 			pdata->vbus_power(pdata->phy_info, 0);
 
 		INIT_WORK(&mhcd->otg_work, msm_hsusb_otg_work);
-		mhcd->xceiv = otg_get_transceiver();
+		mhcd->xceiv = usb_get_transceiver();
 		if (!mhcd->xceiv)
 			return -ENODEV;
-		otg = container_of(mhcd->xceiv, struct msm_otg, otg);
+		otg = container_of(mhcd->xceiv, struct msm_otg, phy);
 		hcd->regs = otg->regs;
 		otg->start_host = msm_hsusb_start_host;
 
-		ret = otg_set_host(mhcd->xceiv, &hcd->self);
+		ret = otg_set_host(mhcd->xceiv->otg, &hcd->self);
 		ehci->transceiver = mhcd->xceiv;
 		break;
 	case USB_PHY_SERIAL_PMIC:
@@ -741,8 +741,8 @@ static void msm_xusb_uninit_host(struct msmusb_hcd *mhcd)
 		if (pdata->vbus_init)
 			pdata->vbus_init(0);
 		hcd_to_ehci(hcd)->transceiver = NULL;
-		otg_set_host(mhcd->xceiv, NULL);
-		otg_put_transceiver(mhcd->xceiv);
+		otg_set_host(mhcd->xceiv->otg, NULL);
+		usb_put_transceiver(mhcd->xceiv);
 		cancel_work_sync(&mhcd->otg_work);
 		break;
 	case USB_PHY_SERIAL_PMIC:

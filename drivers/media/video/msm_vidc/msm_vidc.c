@@ -29,7 +29,7 @@ int msm_vidc_poll(void *instance, struct file *filp,
 	struct vb2_buffer *out_vb = NULL;
 	struct vb2_buffer *cap_vb = NULL;
 	unsigned long flags;
-	poll_wait(filp, &inst->event_handler.events->wait, wait);
+	poll_wait(filp, &inst->event_handler.wait, wait);
 	if (v4l2_event_pending(&inst->event_handler))
 		return POLLPRI;
 	if (!outq->streaming && !capq->streaming) {
@@ -37,7 +37,7 @@ int msm_vidc_poll(void *instance, struct file *filp,
 			outq->streaming, capq->streaming);
 		return POLLERR;
 	}
-	poll_wait(filp, &inst->event_handler.events->wait, wait);
+	poll_wait(filp, &inst->event_handler.wait, wait);
 	if (v4l2_event_pending(&inst->event_handler))
 		return POLLPRI;
 	poll_wait(filp, &capq->done_wq, wait);
@@ -186,7 +186,7 @@ int msm_vidc_streamoff(void *instance, enum v4l2_buf_type i)
 void *vidc_get_userptr(void *alloc_ctx, unsigned long vaddr,
 				unsigned long size, int write)
 {
-	return NULL;
+	return (void *)0xdeadbeef;
 }
 
 void vidc_put_userptr(void *buf_priv)

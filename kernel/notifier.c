@@ -1,6 +1,6 @@
 #include <linux/kdebug.h>
 #include <linux/kprobes.h>
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/notifier.h>
 #include <linux/rcupdate.h>
 #include <linux/vmalloc.h>
@@ -12,6 +12,14 @@
  *	and the like.
  */
 BLOCKING_NOTIFIER_HEAD(reboot_notifier_list);
+
+#ifdef CONFIG_SRECORDER_MSM
+#ifdef CONFIG_SRECORDER_POWERCOLLAPS
+#ifndef CONFIG_KPROBES
+ RAW_NOTIFIER_HEAD(emergency_reboot_notifier_list);
+#endif
+#endif /* CONFIG_SRECORDER_POWERCOLLAPS */
+#endif /* CONFIG_SRECORDER_MSM */
 
 /*
  *	Notifier chain core routines.  The exported routines below
@@ -524,37 +532,6 @@ void srcu_init_notifier_head(struct srcu_notifier_head *nh)
 	nh->head = NULL;
 }
 EXPORT_SYMBOL_GPL(srcu_init_notifier_head);
-
-/**
- *	register_reboot_notifier - Register function to be called at reboot time
- *	@nb: Info about notifier function to be called
- *
- *	Registers a function with the list of functions
- *	to be called at reboot time.
- *
- *	Currently always returns zero, as blocking_notifier_chain_register()
- *	always returns zero.
- */
-int register_reboot_notifier(struct notifier_block *nb)
-{
-	return blocking_notifier_chain_register(&reboot_notifier_list, nb);
-}
-EXPORT_SYMBOL(register_reboot_notifier);
-
-/**
- *	unregister_reboot_notifier - Unregister previously registered reboot notifier
- *	@nb: Hook to be unregistered
- *
- *	Unregisters a previously registered reboot
- *	notifier function.
- *
- *	Returns zero on success, or %-ENOENT on failure.
- */
-int unregister_reboot_notifier(struct notifier_block *nb)
-{
-	return blocking_notifier_chain_unregister(&reboot_notifier_list, nb);
-}
-EXPORT_SYMBOL(unregister_reboot_notifier);
 
 static ATOMIC_NOTIFIER_HEAD(die_chain);
 

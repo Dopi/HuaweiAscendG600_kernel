@@ -48,6 +48,7 @@
 #define FORMAT_ATRAC	0x0016
 #define FORMAT_MAT	0x0017
 #define FORMAT_AAC	0x0018
+#define FORMAT_DTS_LBR 0x0019
 
 #define ENCDEC_SBCBITRATE   0x0001
 #define ENCDEC_IMMEDIATE_DECODE 0x0002
@@ -81,7 +82,8 @@
 #define SESSION_MAX	0x08
 
 #define SOFT_PAUSE_PERIOD       30   /* ramp up/down for 30ms    */
-#define SOFT_PAUSE_STEP         2000 /* Step value 2ms or 2000us */
+#define SOFT_PAUSE_STEP_LINEAR  0    /* Step value 0ms or 0us */
+#define SOFT_PAUSE_STEP         2000 /* Step value 2000ms or 2000us */
 enum {
 	SOFT_PAUSE_CURVE_LINEAR = 0,
 	SOFT_PAUSE_CURVE_EXP,
@@ -89,7 +91,8 @@ enum {
 };
 
 #define SOFT_VOLUME_PERIOD       30   /* ramp up/down for 30ms    */
-#define SOFT_VOLUME_STEP         2000 /* Step value 2ms or 2000us */
+#define SOFT_VOLUME_STEP_LINEAR  0    /* Step value 0ms or 0us */
+#define SOFT_VOLUME_STEP         2000 /* Step value 2000ms or 2000us */
 enum {
 	SOFT_VOLUME_CURVE_LINEAR = 0,
 	SOFT_VOLUME_CURVE_EXP,
@@ -148,6 +151,7 @@ struct audio_client {
 
 	atomic_t		cmd_state;
 	atomic_t		time_flag;
+	atomic_t		nowait_cmd_cnt;
 	wait_queue_head_t	cmd_wait;
 	wait_queue_head_t	time_wait;
 
@@ -155,6 +159,7 @@ struct audio_client {
 	void			*priv;
 	uint32_t         io_mode;
 	uint64_t         time_stamp;
+	atomic_t         cmd_response;
 };
 
 void q6asm_audio_client_free(struct audio_client *ac);
@@ -177,6 +182,8 @@ int q6asm_audio_client_buf_free_contiguous(unsigned int dir,
 			struct audio_client *ac);
 
 int q6asm_open_read(struct audio_client *ac, uint32_t format);
+
+int q6asm_open_read_compressed(struct audio_client *ac, uint32_t format);
 
 int q6asm_open_write(struct audio_client *ac, uint32_t format);
 
@@ -235,6 +242,9 @@ int q6asm_enc_cfg_blk_aac(struct audio_client *ac,
 			 uint32_t mode, uint32_t format);
 
 int q6asm_enc_cfg_blk_pcm(struct audio_client *ac,
+			uint32_t rate, uint32_t channels);
+
+int q6asm_enc_cfg_blk_pcm_native(struct audio_client *ac,
 			uint32_t rate, uint32_t channels);
 
 int q6asm_enc_cfg_blk_multi_ch_pcm(struct audio_client *ac,

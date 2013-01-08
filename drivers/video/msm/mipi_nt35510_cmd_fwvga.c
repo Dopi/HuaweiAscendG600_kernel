@@ -18,21 +18,22 @@
 
 static lcd_panel_type lcd_panel_fwvga = LCD_NONE;
 
+/* increase the DSI bit clock to 490 MHz */
 /*mipi dsi register setting , help qualcomm to set.*/
 static struct mipi_dsi_phy_ctrl dsi_cmd_mode_phy_db_nt35510_fwvga = 
 {
-	/* DSI Bit Clock at 320 MHz, 2 lane, RGB888 */ 
+	/* DSI Bit Clock at 490 MHz, 2 lane, RGB888 */ 
 	/* regulator */ 
 	{0x03, 0x01, 0x01, 0x00, 0x00}, 
 	/* timing */ 
-	{0x62, 0x29, 0xC, 0x00, 0x35, 0x3E, 0x11, 0x2C, 
-	0xF, 0x3, 0x04, 0x00},
+	{0x88, 0x32, 0x14, 0x00, 0x44, 0x4F, 0x18, 0x35, 
+	0x17, 0x3, 0x04, 0x00},
 	/* phy ctrl */ 
 	{0x7f, 0x00, 0x00, 0x00}, 
 	/* strength */ 
 	{0xbb, 0x02, 0x06, 0x00}, 
 	/* pll control */ 
-	{0x1, 0x3B, 0x31, 0xd2, 0x00, 0x40, 0x37, 0x62, 
+	{0x1, 0xE3, 0x31, 0xd2, 0x00, 0x40, 0x37, 0x62, 
 	0x01, 0x0f, 0x07, 
 	0x05, 0x14, 0x03, 0x0, 0x0, 0x0, 0x20, 0x0, 0x02, 0x0}, 
 };
@@ -40,6 +41,30 @@ static struct mipi_dsi_phy_ctrl dsi_cmd_mode_phy_db_nt35510_fwvga =
 static struct dsi_buf nt35510_fwvga_tx_buf;
 static struct sequence * nt35510_fwvga_lcd_init_table_debug = NULL;
 
+/*Read register in order to solve LCD can't enter into black panel in ESD testing */
+static struct dsi_buf nt35510_fwvga_rx_buf;
+
+static char register_id[2] = {0x0A, 0x00}; /* DTYPE_DCS_READ */
+
+static struct dsi_cmd_desc nt35510_register_id_cmd = {
+	DTYPE_DCS_READ, 1, 0, 1, 5, sizeof(register_id), register_id};
+
+static uint32 mipi_nt35510_read_register(struct msm_fb_data_type *mfd)
+{
+	struct dsi_buf *rp = NULL;
+	struct dsi_buf *tp = NULL;
+	struct dsi_cmd_desc *cmd = NULL;
+	char *lp = NULL;
+
+	tp = &nt35510_fwvga_tx_buf;
+	rp = &nt35510_fwvga_rx_buf;
+	cmd = &nt35510_register_id_cmd;
+	mipi_dsi_cmds_rx(mfd, tp, rp, cmd, 1);
+	lp = (char *)rp->data;	
+	pr_info("%s: register_id=%02x\n", __func__, *lp);
+	
+	return *lp;
+}
 
 /*LCD init code*/
 static const struct sequence nt35510_fwvga_standby_enter_table[]= 
@@ -788,6 +813,9 @@ static int mipi_nt35510_fwvga_lcd_off(struct platform_device *pdev)
 		return -ENODEV;
 	if (mfd->key != MFD_KEY)
 		return -EINVAL;
+	
+	/* clean up ack_err_status */
+	mipi_nt35510_read_register(mfd);
 
 	process_mipi_table(mfd,&nt35510_fwvga_tx_buf,(struct sequence*)&nt35510_fwvga_standby_enter_table,
 		 ARRAY_SIZE(nt35510_fwvga_standby_enter_table), lcd_panel_fwvga);
@@ -798,15 +826,15 @@ static int mipi_nt35510_fwvga_lcd_off(struct platform_device *pdev)
 #ifdef CONFIG_FB_AUTO_CABC
 static struct sequence nt35510_fwvga_auto_cabc_set_table[] =
 {
-	{0x00051,MIPI_GEN_COMMAND,0},
-	{0x000FF,TYPE_PARAMETER,0},//max brightness
-	{0x00053,MIPI_GEN_COMMAND,0},
-	{0x0002C,TYPE_PARAMETER,0},//open cabc
-	{0x00055,MIPI_GEN_COMMAND,0},
+	 
+	/* Delete two lines,These lines are set lcd backlight max brightness*/
+	/* change cabc mode from video to UI */
+	{0x00053,MIPI_DCS_COMMAND,0},
+	{0x00024,TYPE_PARAMETER,0},//open cabc
+	{0x00055,MIPI_DCS_COMMAND,0},
 	{0x00000,TYPE_PARAMETER,0},
 	{0x00029,MIPI_TYPE_END,0},
 };
-
 /***************************************************************
 Function: nt35510_config_cabc
 Description: Set CABC configuration
@@ -822,11 +850,15 @@ static int nt35510_fwvga_config_auto_cabc(struct msmfb_cabc_config cabc_cfg,stru
 	switch(cabc_cfg.mode)
 	{
 		case CABC_MODE_UI:
-			nt35510_fwvga_auto_cabc_set_table[5].reg=0x00001;
+			/* the value of cabc register should be 24 in UI mode */
+			nt35510_fwvga_auto_cabc_set_table[1].reg=0x00024;
+			nt35510_fwvga_auto_cabc_set_table[3].reg=0x00001;
 			break;
 		case CABC_MODE_MOVING:
 		case CABC_MODE_STILL:
-			nt35510_fwvga_auto_cabc_set_table[5].reg=0x00003;
+			/* the value of cabc register should be 2C in moving mode and still mode */
+			nt35510_fwvga_auto_cabc_set_table[1].reg=0x0002C;
+			nt35510_fwvga_auto_cabc_set_table[3].reg=0x00003;
 			break;
 		default:
 			LCD_DEBUG("%s: invalid cabc mode: %d\n", __func__, cabc_cfg.mode);
@@ -854,13 +886,15 @@ static int __devinit mipi_nt35510_fwvga_lcd_probe(struct platform_device *pdev)
 
 static struct sequence nt35510_fwvga_write_cabc_brightness_table[]= 
 {
-	{0x00051,MIPI_GEN_COMMAND,0},
+	{0x00051,MIPI_DCS_COMMAND,0},
 	{0x000FF,TYPE_PARAMETER,0},//max brightness
 	{0x00029,MIPI_TYPE_END,0}
 };
 /*lcd cabc control function*/
 void nt35510_fwvga_set_cabc_backlight(struct msm_fb_data_type *mfd,uint32 bl_level)
-{	
+{
+    /* clean up ack_err_status */
+	mipi_nt35510_read_register(mfd);
 	nt35510_fwvga_write_cabc_brightness_table[1].reg = bl_level; 
 
 	process_mipi_table(mfd,&nt35510_fwvga_tx_buf,(struct sequence*)&nt35510_fwvga_write_cabc_brightness_table,
@@ -899,12 +933,13 @@ static int __init mipi_cmd_nt35510_fwvga_init(void)
 	int ret = 0;
 	struct msm_panel_info *pinfo = NULL;
 	lcd_panel_fwvga = get_lcd_panel_type();
-	if (MIPI_NT35510_BOE_FWVGA != lcd_panel_fwvga )
+	if (MIPI_CMD_NT35510_BOE_FWVGA != lcd_panel_fwvga )
 	{
 		return 0;
 	}
-	printk("enter mipi_cmd_nt35510_fwvga_init \n");
+	LCD_DEBUG("enter mipi_cmd_nt35510_fwvga_init \n");
 	mipi_dsi_buf_alloc(&nt35510_fwvga_tx_buf, DSI_BUF_SIZE);
+	mipi_dsi_buf_alloc(&nt35510_fwvga_rx_buf, DSI_BUF_SIZE);
 
 	ret = platform_driver_register(&this_driver);
 	if (!ret)
@@ -919,7 +954,8 @@ static int __init mipi_cmd_nt35510_fwvga_init(void)
 		pinfo->bl_max = 255;
 		pinfo->bl_min = 30;		
 		pinfo->fb_num = 2;
-		pinfo->clk_rate = 320000000;
+        /* increase the DSI bit clock to 490 MHz */
+		pinfo->clk_rate = 490000000;
 		pinfo->lcd.refx100 = 6000; /* adjust refx100 to prevent tearing */
 
 		pinfo->mipi.mode = DSI_CMD_MODE;
@@ -947,7 +983,7 @@ static int __init mipi_cmd_nt35510_fwvga_init(void)
 
 		ret = platform_device_register(&this_device);
 		if (ret)
-			printk("%s: failed to register device!\n", __func__);
+			LCD_DEBUG("%s: failed to register device!\n", __func__);
 	}
 
 	return ret;

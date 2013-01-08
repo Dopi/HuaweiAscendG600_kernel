@@ -18,21 +18,22 @@
 
 static lcd_panel_type lcd_panel_wvga = LCD_NONE;
 
+/* increase the DSI bit clock to 490 MHz */
 /*mipi dsi register setting , help qualcomm to set.*/
 static struct mipi_dsi_phy_ctrl dsi_cmd_mode_phy_db = 
 {
-    /* DSI Bit Clock at 300 MHz, 2 lane, RGB888 */ 
+    /* DSI Bit Clock at 490 MHz, 2 lane, RGB888 */ 
 	/* regulator */ 
 	{0x03, 0x01, 0x01, 0x00}, 
 	/* timing */ 
-	{0x5D, 0x28, 0xB, 0x00, 0x33, 0x38, 0x10, 0x2C, 
-	0xE, 0x3, 0x04}, 
+	{0x88, 0x32, 0x14, 0x00, 0x44, 0x4F, 0x18, 0x35, 
+	0x17, 0x3, 0x04, 0x00}, 
 	/* phy ctrl */ 
 	{0x7f, 0x00, 0x00, 0x00}, 
 	/* strength */ 
 	{0xbb, 0x02, 0x06, 0x00}, 
 	/* pll control */ 
-	{0x01, 0x27, 0x31, 0xd2, 0x00, 0x40, 0x37, 0x62, 
+	{0x1, 0xE3, 0x31, 0xd2, 0x00, 0x40, 0x37, 0x62, 
 	0x01, 0x0f, 0x07, 
 	0x05, 0x14, 0x03, 0x0, 0x0, 0x0, 0x20, 0x0, 0x02, 0x0}, 
 };
@@ -155,7 +156,7 @@ static int hx8369a_config_auto_cabc(struct msmfb_cabc_config cabc_cfg,struct msm
 	if(likely(0 == ret))
 	{
 		process_mipi_table(mfd,&hx8369a_tx_buf,(struct sequence*)&hx8369a_auto_cabc_set_table,
-			 ARRAY_SIZE(hx8369a_auto_cabc_set_table), MIPI_HX8369A_TIANMA_WVGA);
+			 ARRAY_SIZE(hx8369a_auto_cabc_set_table), lcd_panel_wvga);
 	}
 
     LCD_DEBUG("%s: change cabc mode to %d\n",__func__,cabc_cfg.mode);
@@ -208,7 +209,7 @@ static int __init mipi_cmd_hx8369a_wvga_init(void)
 	struct msm_panel_info *pinfo = NULL;
 
 	lcd_panel_wvga = get_lcd_panel_type();
-	if ((MIPI_HX8369A_TIANMA_WVGA!= lcd_panel_wvga ))
+	if ((MIPI_CMD_HX8369A_TIANMA_WVGA!= lcd_panel_wvga ))
 	{
 		return 0;
 	}
@@ -230,8 +231,9 @@ static int __init mipi_cmd_hx8369a_wvga_init(void)
 		pinfo->bl_min = 30;		
 		
 		pinfo->fb_num = 2;
-		
-        pinfo->clk_rate = 300000000;
+
+        /* increase the DSI bit clock to 490 MHz */		
+        pinfo->clk_rate = 490000000;
 		
 		pinfo->lcd.refx100 = 6000; /* adjust refx100 to prevent tearing */
 

@@ -31,6 +31,7 @@
 #include <asm/mach-types.h>
 #include <linux/earlysuspend.h>
 #include <linux/hardware_self_adapt.h>
+#include <asm/system.h>
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
 #include <linux/hw_dev_dec.h>
 #endif

@@ -14,6 +14,7 @@
  *
  */
 
+#include <linux/export.h>
 #include <linux/miscdevice.h>
 #include <linux/platform_device.h>
 #include <linux/fs.h>
@@ -24,6 +25,7 @@
 #include <linux/debugfs.h>
 #include <linux/android_pmem.h>
 #include <linux/mempolicy.h>
+#include <linux/sched.h>
 #include <linux/kobject.h>
 #include <linux/pm_runtime.h>
 #include <linux/memory_alloc.h>
@@ -2586,8 +2588,7 @@ static void ioremap_pmem(int id)
 			type = get_mem_type(MT_DEVICE);
 		DLOG("PMEMDEBUG: Remap phys %lx to virt %lx on %s\n",
 			pmem[id].base, addr, pmem[id].name);
-		if (ioremap_page_range(addr, addr + pmem[id].size,
-			pmem[id].base, __pgprot(type->prot_pte))) {
+		if (ioremap_pages(addr, pmem[id].base,  pmem[id].size, type)) {
 				pr_err("pmem: Failed to map pages\n");
 				BUG();
 		}

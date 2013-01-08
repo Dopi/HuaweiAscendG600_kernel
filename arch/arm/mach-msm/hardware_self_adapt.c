@@ -181,12 +181,11 @@ struct bt_device bt_device_array[] =
 hw_bt_device_model get_hw_bt_device_model(void)
 {
     if(machine_is_msm8x25_U8950D()
-        || machine_is_msm8x25_U8950()
-        || machine_is_msm7x27a_H867G()
-        || machine_is_msm8x25_H881C()	
-        || machine_is_msm7x27a_H868C()	
-        || machine_is_msm8x25_C8950D()
-        || machine_is_msm7x27a_U8655_EMMC())
+	  || machine_is_msm8x25_U8950()
+      || machine_is_msm7x27a_H867G()
+      || machine_is_msm8x25_H881C()
+      || machine_is_msm7x27a_H868C()	
+      || machine_is_msm8x25_C8950D())
     {
         return BT_BCM4330;
     }
@@ -198,7 +197,7 @@ hw_bt_device_model get_hw_bt_device_model(void)
       || machine_is_msm8x25_U8951()
       || machine_is_msm8x25_U8833D()
       || machine_is_msm8x25_U8833()
-      || machine_is_msm8x25_C8951()
+      || machine_is_msm8x25_C8813()
       || machine_is_msm8x25_C8812P())
     {
         return BT_WCN2243;
@@ -229,6 +228,8 @@ char *get_bt_device_name(void)
 	return bt_device_array[i].dev_name;
 } 
 
+/* modify spk mic function name */
+/* Add DTS property */
 void get_audio_property(char *audio_property)
 {
   unsigned int property = AUDIO_PROPERTY_INVALID;
@@ -236,15 +237,17 @@ void get_audio_property(char *audio_property)
   audio_property_type fir_enable = FIR_DISABLE;
   audio_property_type fm_type = FM_BROADCOM;
   audio_property_type spk_type = MONO_SPEAKER;
-  audio_property_type secondmic_type = SECONDMIC_NONE;
+  audio_property_type spkmic_type = SPK_MAIN_MIC;
+  audio_property_type dts_enable = DTS_DISABLE;
   
   mic_type = get_audio_mic_type();
   fir_enable = get_audio_fir_enabled();
   fm_type =  get_audio_fm_type();
   spk_type = get_audio_speaker_type();
-  secondmic_type = get_audio_2ndmic_type();
+  spkmic_type = get_audio_spkmic_type();
+  dts_enable = get_audio_dts_enable();
   
-  property = secondmic_type | spk_type | fm_type | fir_enable | mic_type ;
+  property = spkmic_type | spk_type | fm_type | fir_enable | mic_type | dts_enable;
 
   sprintf(audio_property, "%8x", property);
 }
@@ -366,7 +369,19 @@ hw_lcd_interface_type get_hw_lcd_interface_type(void)
 	}
 	else
 	{
-		lcd_interface_type = LCD_IS_MIPI_CMD;
+		/*add mipi video interface*/
+		switch(hw_lcd_panel)
+		{
+			case MIPI_VIDEO_NT35512_BOE_WVGA:
+			case MIPI_VIDEO_HX8369B_TIANMA_WVGA:
+			case MIPI_VIDEO_OTM8018B_CHIMEI_WVGA:
+			case MIPI_VIDEO_NT35512_BYD_WVGA:
+				lcd_interface_type = LCD_IS_MIPI_VIDEO;
+				break;
+			default:
+				lcd_interface_type = LCD_IS_MIPI_CMD;
+				break;
+		}
 	}
 	return lcd_interface_type;
 }
@@ -444,7 +459,7 @@ lcd_type get_hw_lcd_resolution_type(void)
 		|| machine_is_msm8255_u8860lp()
         || machine_is_msm8255_u8860_r()
 		|| machine_is_msm8255_u8860_92()
-        || machine_is_msm8x25_C8951()
+        || machine_is_msm8x25_C8813()
 		|| machine_is_msm8255_u8860_51()
 		|| machine_is_msm8x25_U8951D()
 		|| machine_is_msm8x25_U8951())
@@ -476,58 +491,95 @@ lcd_type get_hw_lcd_resolution_type(void)
     return lcd_resolution;
 }
 
+/*modify lcd name*/
 lcd_panel_type get_lcd_panel_type(void)
 {
 	lcd_panel_type hw_lcd_panel = LCD_NONE;
 	/*remove two products to adjust new LCD type*/
 	/* separate Y300 from 8825 serials and make sure it can run BOE LCD well */
+	/* Add Oem LCD driver */
 	if ( machine_is_msm8x25_C8833D() 
-        || machine_is_msm8x25_U8833D()
-        || machine_is_msm8x25_U8833()
-       )
+		|| machine_is_msm8x25_U8833D()	
+		|| machine_is_msm8x25_U8833()
+	)
 	{
 		switch (lcd_id)
 		{
 			case LCD_HW_ID0:
-				hw_lcd_panel = MIPI_OTM8009A_CHIMEI_WVGA;
+				hw_lcd_panel = MIPI_CMD_OTM8009A_CHIMEI_WVGA;
 				break;
 			case LCD_HW_ID1:
-				hw_lcd_panel = MIPI_HX8369A_TIANMA_WVGA;
+				hw_lcd_panel = MIPI_CMD_HX8369A_TIANMA_WVGA;
+				break;
+			case LCD_HW_ID2:
+				hw_lcd_panel = MIPI_VIDEO_HX8369B_TIANMA_WVGA;
 				break;
 			case LCD_HW_ID5:
-				hw_lcd_panel = MIPI_NT35510_BOE_WVGA;
+				hw_lcd_panel = MIPI_CMD_NT35510_BOE_WVGA;
+				break;
+			/*Add nt35512 video mode for byd*/
+			case LCD_HW_ID6:
+				hw_lcd_panel = MIPI_VIDEO_NT35512_BYD_WVGA;
+				break;
+			/*Add otm8018b for video mode*/
+			case LCD_HW_ID8:
+				hw_lcd_panel = MIPI_VIDEO_OTM8018B_CHIMEI_WVGA;
+				break;
+			/*Add nt35512 for video mode*/
+			case LCD_HW_ID9:
+				hw_lcd_panel = MIPI_VIDEO_NT35512_BOE_WVGA;
+				break;
+            case LCD_HW_IDA:
+                hw_lcd_panel = MIPI_CMD_NT35510_CHIMEI_WVGA;
 				break;
 			default:
-				hw_lcd_panel = MIPI_NT35510_BOE_WVGA;
+				hw_lcd_panel = MIPI_CMD_NT35510_BOE_WVGA;
+				break;
+		}
+	}
+	else if (machine_is_msm8x25_H881C())
+	{
+		switch (lcd_id)
+		{
+			case LCD_HW_ID0:
+				hw_lcd_panel = MIPI_CMD_NT35510_CHIMEI_WVGA;
+				break;
+			case LCD_HW_ID1:
+				hw_lcd_panel = MIPI_CMD_HX8369A_TIANMA_WVGA;
+				break;
+			case LCD_HW_ID5:
+				hw_lcd_panel = MIPI_CMD_NT35510_BOE_WVGA;
+				break;
+			default:
+				hw_lcd_panel = MIPI_CMD_NT35510_BOE_WVGA;
 				break;
 		}
 	}
 	else if(  machine_is_msm8x25_U8825()
-		|| machine_is_msm8x25_U8825D()
-        || machine_is_msm8x25_H881C()		
+		|| machine_is_msm8x25_U8825D()	
 		|| machine_is_msm8x25_C8825D()
 		|| machine_is_msm8x25_C8812P()
-		)
+	)
 	{
 		switch (lcd_id)
 		{
 			case LCD_HW_ID0:
-				hw_lcd_panel = MIPI_RSP61408_CHIMEI_WVGA;
+				hw_lcd_panel = MIPI_CMD_RSP61408_CHIMEI_WVGA;
 				break;
 			case LCD_HW_ID1:
-				hw_lcd_panel = MIPI_HX8369A_TIANMA_WVGA;
+				hw_lcd_panel = MIPI_CMD_HX8369A_TIANMA_WVGA;
 				break;
 			case LCD_HW_ID4:
-				hw_lcd_panel = MIPI_RSP61408_BYD_WVGA;
+				hw_lcd_panel = MIPI_CMD_RSP61408_BYD_WVGA;
 				break;
 			case LCD_HW_ID5:
-				hw_lcd_panel = MIPI_RSP61408_TRULY_WVGA;
+				hw_lcd_panel = MIPI_CMD_RSP61408_TRULY_WVGA;
 				break;
 			case LCD_HW_IDA:
-				hw_lcd_panel = MIPI_NT35510_BOE_WVGA;
+				hw_lcd_panel = MIPI_CMD_NT35510_BOE_WVGA;
 				break;
 			default:
-				hw_lcd_panel = MIPI_NT35510_BOE_WVGA;
+				hw_lcd_panel = MIPI_CMD_NT35510_BOE_WVGA;
 				break;
 		}
 	}
@@ -538,30 +590,33 @@ lcd_panel_type get_lcd_panel_type(void)
 		switch (lcd_id)
 		{
 			case LCD_HW_ID0:
-				hw_lcd_panel = MIPI_NT35516_CHIMEI_QHD;
+				hw_lcd_panel = MIPI_CMD_NT35516_CHIMEI_QHD;
 				break;
 			case LCD_HW_ID5:
-				hw_lcd_panel = MIPI_NT35516_TIANMA_QHD;
+				hw_lcd_panel = MIPI_CMD_NT35516_TIANMA_QHD;
 				break;
 			default: 
-				hw_lcd_panel = MIPI_NT35516_TIANMA_QHD;
+				hw_lcd_panel = MIPI_CMD_NT35516_TIANMA_QHD;
 				break;
 		}
 	}
 	else if ( machine_is_msm8x25_U8951D()
-        || machine_is_msm8x25_C8951()
+        || machine_is_msm8x25_C8813()
 		|| machine_is_msm8x25_U8951())
 	{
 		switch (lcd_id)
 		{
 			case LCD_HW_ID0:
-				hw_lcd_panel = MIPI_NT35510_BOE_FWVGA;
+				hw_lcd_panel = MIPI_CMD_NT35510_BOE_FWVGA;
 				break;
 			case LCD_HW_ID1:
-				hw_lcd_panel = MIPI_HX8369A_TIANMA_FWVGA;
+				hw_lcd_panel = MIPI_CMD_HX8369A_TIANMA_FWVGA;
+				break;
+			case LCD_HW_ID4:
+				hw_lcd_panel = MIPI_CMD_OTM8009A_CHIMEI_FWVGA;
 				break;
 			default:
-				hw_lcd_panel = MIPI_HX8369A_TIANMA_FWVGA;
+				hw_lcd_panel = MIPI_CMD_HX8369A_TIANMA_FWVGA;
 				break;
 		}
 	}
@@ -572,16 +627,16 @@ lcd_panel_type get_lcd_panel_type(void)
 		switch (lcd_id)
 		{
 			case LCD_HW_ID0:
-				hw_lcd_panel = MIPI_RSP61408_CHIMEI_WVGA;
+				hw_lcd_panel = MIPI_CMD_RSP61408_CHIMEI_WVGA;
 				break;
 			case LCD_HW_ID1:
-				hw_lcd_panel = MIPI_HX8369A_TIANMA_WVGA;
+				hw_lcd_panel = MIPI_CMD_HX8369A_TIANMA_WVGA;
 				break;
 			case LCD_HW_ID4:
-				hw_lcd_panel = MIPI_RSP61408_BYD_WVGA;
+				hw_lcd_panel = MIPI_CMD_RSP61408_BYD_WVGA;
 				break;
 			case LCD_HW_ID5:
-				hw_lcd_panel = MIPI_RSP61408_TRULY_WVGA;
+				hw_lcd_panel = MIPI_CMD_RSP61408_TRULY_WVGA;
 				break;
 			default:
 				/*no mipi LCD lead to block, so default lcd RGB */
@@ -594,39 +649,81 @@ lcd_panel_type get_lcd_panel_type(void)
 		switch (lcd_id)
 		{
 			case LCD_HW_ID0:
-				hw_lcd_panel = MIPI_HX8357C_CHIMEI_HVGA;
+				hw_lcd_panel = MIPI_CMD_HX8357C_CHIMEI_HVGA;
 				break;
 			case LCD_HW_ID1:
-			    hw_lcd_panel = MIPI_HX8357C_TIANMA_IPS_HVGA;
+			    hw_lcd_panel = MIPI_CMD_HX8357C_TIANMA_IPS_HVGA;
 				break;
 			case LCD_HW_ID4:
-				hw_lcd_panel = MIPI_HX8357C_CHIMEI_IPS_HVGA;
+				hw_lcd_panel = MIPI_CMD_HX8357C_CHIMEI_IPS_HVGA;
 				break;
 			case LCD_HW_ID5:
-				hw_lcd_panel = MIPI_HX8357C_TIANMA_HVGA;
+				hw_lcd_panel = MIPI_CMD_HX8357C_TIANMA_HVGA;
 				break;
 			default: 
 				/*no mipi LCD lead to block, so default lcd RGB */
-				hw_lcd_panel = MIPI_HX8357C_CHIMEI_IPS_HVGA;
+				hw_lcd_panel = MIPI_CMD_HX8357C_CHIMEI_IPS_HVGA;
 				break;
 		}
 	}
-	else if(machine_is_msm7x27a_H868C()
-		 || machine_is_msm7x27a_H867G())
+	else if(machine_is_msm7x27a_H867G())
+	{
+		/* U8686 is H867G ver.E,use tianma IPS and chimei IPS LCD */
+		if(HW_VER_SUB_VE == get_hw_sub_board_id())
+		{
+			switch (lcd_id)
+			{
+				case LCD_HW_ID0:
+					hw_lcd_panel = MIPI_CMD_NT35310_BYD_HVGA;
+					break;
+				case LCD_HW_ID1:
+					hw_lcd_panel = MIPI_CMD_HX8357C_TIANMA_IPS_HVGA;
+					break;
+				case LCD_HW_ID4:
+					hw_lcd_panel = MIPI_CMD_HX8357C_CHIMEI_IPS_HVGA;
+					break;
+				case LCD_HW_ID5:
+					hw_lcd_panel = MIPI_CMD_NT35310_BOE_HVGA;
+					break;
+				default:
+					hw_lcd_panel = MIPI_CMD_NT35310_BOE_HVGA;
+					break;
+			}
+		}
+		else
+		{
+			switch (lcd_id)
+			{
+				case LCD_HW_ID0:
+					hw_lcd_panel = MIPI_CMD_NT35310_BYD_HVGA;
+					break;
+				case LCD_HW_ID1:
+					hw_lcd_panel = MIPI_CMD_NT35310_TIANMA_HVGA;
+					break;
+				case LCD_HW_ID5:
+					hw_lcd_panel = MIPI_CMD_NT35310_BOE_HVGA;
+					break;
+				default:
+					hw_lcd_panel = MIPI_CMD_NT35310_BOE_HVGA;
+					break;
+			}
+		}
+	}
+	else if(machine_is_msm7x27a_H868C())
 	{
 		switch (lcd_id)
 		{
 			case LCD_HW_ID0:
-				hw_lcd_panel = MIPI_NT35310_BYD_HVGA;
+				hw_lcd_panel = MIPI_CMD_NT35310_BYD_HVGA;
 				break;
 			case LCD_HW_ID1:
-				hw_lcd_panel = MIPI_NT35310_TIANMA_HVGA;
+				hw_lcd_panel = MIPI_CMD_NT35310_TIANMA_HVGA;
 				break;
 			case LCD_HW_ID5:
-				hw_lcd_panel = MIPI_NT35310_BOE_HVGA;
+				hw_lcd_panel = MIPI_CMD_NT35310_BOE_HVGA;
 				break;
-			default: 
-				hw_lcd_panel = MIPI_NT35310_BOE_HVGA;
+			default:
+				hw_lcd_panel = MIPI_CMD_NT35310_BOE_HVGA;
 				break;
 		}
 	}
@@ -746,7 +843,7 @@ compass_gs_position_type  get_compass_gs_position(void)
 		compass_gs_position = COMPASS_BOTTOM_GS_TOP;
 	}
     else if (machine_is_msm8x25_C8812P()
-         || machine_is_msm8x25_C8951()
+         || machine_is_msm8x25_C8813()
 	     || machine_is_msm8x25_U8951D() )
 	{
 		compass_gs_position=COMPASS_NONE_GS_BOTTOM;
@@ -789,6 +886,7 @@ lcd_align_type get_lcd_align_type (void)
 
     return lcd_align;
 }
+/*modify lcd name*/
 char *get_lcd_panel_name(void)
 {
 	lcd_panel_type hw_lcd_panel = LCD_NONE;
@@ -909,63 +1007,81 @@ char *get_lcd_panel_name(void)
 			pname = "CHIMEI NT35410";
 			break;
 			
-		case MIPI_RSP61408_CHIMEI_WVGA:
+		case MIPI_CMD_RSP61408_CHIMEI_WVGA:
 			pname = "CHIMEI RSP61408";
 			break;
 			
-		case MIPI_RSP61408_BYD_WVGA:
+		case MIPI_CMD_RSP61408_BYD_WVGA:
 			pname = "BYD RSP61408";
 			break;
 
-		case MIPI_RSP61408_TRULY_WVGA: 
+		case MIPI_CMD_RSP61408_TRULY_WVGA: 
 			pname = "TRULY RSP61408";
 			break;
 
-		case MIPI_HX8357C_TIANMA_IPS_HVGA:
+		case MIPI_CMD_HX8357C_TIANMA_IPS_HVGA:
 		    pname = "TIANMA IPS HX8357C";
 		    break;
-		case MIPI_NT35510_BOE_WVGA:
+		case MIPI_CMD_NT35510_BOE_WVGA:
 			pname = "BOE NT35510";
 			break;
-		case MIPI_HX8357C_CHIMEI_HVGA:
+		case MIPI_CMD_HX8357C_CHIMEI_HVGA:
 			pname = "CHIMEI HX8357C";
 			break;
 			
-		case MIPI_HX8357C_TIANMA_HVGA:
+		case MIPI_CMD_HX8357C_TIANMA_HVGA:
 			pname = "TIANMA HX8357C";
 			break;
 			
-		case MIPI_HX8369A_TIANMA_WVGA:
+		case MIPI_CMD_HX8369A_TIANMA_WVGA:
 			pname = "TIANMA HX8369A";
 			break;
-			
-		case MIPI_HX8357C_CHIMEI_IPS_HVGA:
+		case MIPI_VIDEO_HX8369B_TIANMA_WVGA:
+			pname = "TIANMA HX8369B";
+			break;
+		case MIPI_CMD_HX8357C_CHIMEI_IPS_HVGA:
 			pname = "CHIMEI IPS HX8357C";
 			break;
 
-		case MIPI_NT35516_TIANMA_QHD:
+		case MIPI_CMD_NT35516_TIANMA_QHD:
 			pname = "TIANMA NT35516";
 			break;
-		case MIPI_NT35516_CHIMEI_QHD:
+		case MIPI_CMD_NT35516_CHIMEI_QHD:
 			pname = "CHIMEI NT35516";
 			break;
-		case MIPI_HX8369A_TIANMA_FWVGA:
+		case MIPI_CMD_HX8369A_TIANMA_FWVGA:
 			pname = "TIANMA HX8369A";
 			break;
-		case MIPI_OTM8009A_CHIMEI_WVGA:
+		case MIPI_CMD_OTM8009A_CHIMEI_FWVGA:
+		case MIPI_CMD_OTM8009A_CHIMEI_WVGA:
 			pname = "CHIMEI OTM8009A";
 			break;
-		case MIPI_NT35510_BOE_FWVGA:
+		/*Add otm8018b for video mode*/
+		case MIPI_VIDEO_OTM8018B_CHIMEI_WVGA:
+			pname = "CHIMEI OTM8018B";
+			break;
+		/*Add nt35512 for video mode*/
+		case MIPI_VIDEO_NT35512_BOE_WVGA:
+			pname = "BOE NT35512";
+			break;
+		/*Add nt35512 video mode for byd*/
+		case MIPI_VIDEO_NT35512_BYD_WVGA:
+			pname = "BYD NT35512";
+			break;
+		case MIPI_CMD_NT35510_BOE_FWVGA:
 			pname = "BOE NT35510";
 			break;
-		case MIPI_NT35310_TIANMA_HVGA:
+		case MIPI_CMD_NT35310_TIANMA_HVGA:
 			pname = "TIANMA NT35310";
 			break;
-		case MIPI_NT35310_BYD_HVGA:
+		case MIPI_CMD_NT35310_BYD_HVGA:
 			pname = "BYD NT35310";
 			break;
-		case MIPI_NT35310_BOE_HVGA:
+		case MIPI_CMD_NT35310_BOE_HVGA:
 			pname = "BOE NT35310";
+			break;
+		case MIPI_CMD_NT35510_CHIMEI_WVGA:
+			pname = "CHIMEI NT35510";
 			break;
 		default:
 			pname = "UNKNOWN LCD";
@@ -1026,13 +1142,12 @@ bool board_support_flash(void)
 	 /*product list that have flash*/
     if( machine_is_msm8x25_U8825()
         || machine_is_msm8x25_U8825D()
-        || machine_is_msm8x25_U8833D()
         || machine_is_msm8x25_U8833()        
         || machine_is_msm8x25_C8825D()
         || machine_is_msm8x25_C8950D()
         || machine_is_msm8x25_U8950D()
         || machine_is_msm8x25_U8951()
-        || machine_is_msm8x25_C8951()
+        || machine_is_msm8x25_C8813()
         || machine_is_msm8x25_H881C()	
         || machine_is_msm8x25_U8950())
 	 {
@@ -1188,7 +1303,7 @@ hw_wifi_device_type get_hw_wifi_device_type(void)
     || machine_is_msm8x25_U8951()
     || machine_is_msm8x25_U8833D()
     || machine_is_msm8x25_U8833()    
-    || machine_is_msm8x25_C8951()
+    || machine_is_msm8x25_C8813()
     || machine_is_msm8x25_C8812P())
   {
       return WIFI_QUALCOMM;
@@ -1213,7 +1328,7 @@ tp_type get_touch_type(void)
         || machine_is_msm8x25_U8951()
         || machine_is_msm8x25_U8833D()
         || machine_is_msm8x25_U8833()        
-        || machine_is_msm8x25_C8951()
+        || machine_is_msm8x25_C8813()
         || machine_is_msm8x25_H881C()		
        )
 	{
@@ -1226,9 +1341,10 @@ tp_type get_touch_type(void)
 }
 
 /* Configuration upgrade mode */
-tp_update_type is_auto_update_fw(void)
+ /* default need to update fw */
+tp_update_type is_need_update_fw(void)
 {
-	return MAN_UPDATE_FW;
+	return NEED_UPDATE_FW;
 }
 
 /*  FUNCTION  get_hw_wifi_device_model
@@ -1249,7 +1365,7 @@ hw_wifi_device_model get_hw_wifi_device_model(void)
         || machine_is_msm8x25_U8951()
         || machine_is_msm8x25_U8833D()
         || machine_is_msm8x25_U8833()        
-        || machine_is_msm8x25_C8951()
+        || machine_is_msm8x25_C8813()
         || machine_is_msm8x25_C8812P())
   {
       return WIFI_QUALCOMM_6005;
@@ -1401,35 +1517,66 @@ audio_property_type get_audio_speaker_type(void)
 /*===========================================================================
 
 
-FUNCTION     audio_property_type get_audio_2ndmic_type
+FUNCTION     audio_property_type get_audio_spkmic_type
 
 DESCRIPTION
-  when the return value is SECONDMIC_EXIST, it represents the phone has dual MIC but does not use the dual MIC filter noise algorithem,
-  the main MIC is used by receiver, and the othe MIC is used by speaker;
-  when the return is SECONDMIC_NONE, it represents the phone only has one MIC.
+           This function descripe which mic type speaker used.
 
 DEPENDENCIES
   
 RETURN VALUE
-  SECONDMIC_EXIST or SECONDMIC_NONE
+  SPK_MAIN_MIC or SPK_SUB_MIC
 
 SIDE EFFECTS
   None
 ===========================================================================*/
-audio_property_type get_audio_2ndmic_type(void)
+audio_property_type get_audio_spkmic_type(void)
 {
     if(machine_is_msm8x25_U8950D()
       || machine_is_msm8x25_U8950()
       || machine_is_msm7x27a_H867G()
       || machine_is_msm7x27a_H868C()
-      || machine_is_msm8x25_U8951()
       || machine_is_msm8x25_C8950D())
     {
-        return SECONDMIC_EXIST;
+        return SPK_SUB_MIC;
     }
     else
     {
-        return SECONDMIC_NONE;
+        return SPK_MAIN_MIC;
+    }
+}
+
+/*===========================================================================
+
+
+FUNCTION     audio_property_type get_audio_dts_enable
+
+DESCRIPTION
+           This function descripe if dts audio effect is enabled.
+
+DEPENDENCIES
+  
+RETURN VALUE
+  DTS_ENABLE or DTS_DISABLE
+
+SIDE EFFECTS
+  None
+===========================================================================*/
+audio_property_type get_audio_dts_enable(void)
+{
+    if( machine_is_msm8x25_U8825()
+      || machine_is_msm8x25_U8825D()
+      || machine_is_msm8x25_C8950D()
+      || machine_is_msm8x25_U8950()
+      || machine_is_msm8x25_U8950D()
+      || machine_is_msm8x25_U8951D()
+      || machine_is_msm8x25_U8951())
+    {
+        return DTS_ENABLE;
+    }
+    else
+    {
+        return DTS_DISABLE;
     }
 }
 
@@ -1441,9 +1588,7 @@ audio_property_type get_audio_2ndmic_type(void)
 FUNCTION     audio_property_type get_audio_mic_type
 
 DESCRIPTION
-  when the return value is SINGLE_MIC, it represents the phone does not use the dual MIC filter noise algorithem,
-  the phone may have one MIC, aslo may have two MIC, that means SINGLE_MIC does not represent the number of MICs;
-  when the return is DUAL_MIC, it represents the phone has two MICS and uses the .dual MIC filter noise algorithem.
+       This function descripe the fluence of dual mic arithmetic is enable or disable
 
 DEPENDENCIES
   
@@ -1468,7 +1613,7 @@ audio_property_type get_audio_mic_type(void)
      || machine_is_msm8x25_U8951()
      || machine_is_msm8x25_U8833D()
      || machine_is_msm8x25_U8833()     
-     || machine_is_msm8x25_C8951()
+     || machine_is_msm8x25_C8813()
      || machine_is_msm8x25_C8812P()
     )
   {
@@ -1486,12 +1631,15 @@ audio_property_type get_audio_fir_enabled(void)
 {
     /* add the fir enabl for C8833D U8833D U8833 */
     /* add the fir for c8812e */
+    /* add fir enable for G510U */
     if(machine_is_msm8x25_C8825D()
        || machine_is_msm8x25_U8825D()
        || machine_is_msm8x25_U8825()
-       || machine_is_msm8x25_C8951()
-       || machine_is_msm8x25_H881C()	
-       || machine_is_msm8x25_C8812P()       
+       || machine_is_msm8x25_C8813()
+       || machine_is_msm8x25_U8951()
+       || machine_is_msm8x25_U8951D()
+       || machine_is_msm8x25_H881C()
+       || machine_is_msm8x25_C8812P()
        || machine_is_msm7x27a_C8820()
        || machine_is_msm7x27a_H867G()
        || machine_is_msm7x27a_H868C()
@@ -1520,7 +1668,7 @@ audio_property_type get_audio_fm_type(void)
       || machine_is_msm8x25_C8833D()
       || machine_is_msm8x25_U8833D()
       || machine_is_msm8x25_U8833()      
-      || machine_is_msm8x25_C8951()
+      || machine_is_msm8x25_C8813()
       || machine_is_msm8x25_C8812P())
    {
        return FM_QUALCOMM;
@@ -1532,18 +1680,20 @@ audio_property_type get_audio_fm_type(void)
 }
 hw_camera_type get_hw_camera_mirror_type(void)
 {
-    hw_camera_type ret = HW_CAMERA_NONES;
+    hw_camera_type ret = HW_NOT_MIRROR_OR_FLIP;
     if( machine_is_msm7x27a_C8820() || machine_is_msm7x27a_U8661() 
-    ||machine_is_msm8x25_U8951()||machine_is_msm8x25_U8951D()
     || machine_is_msm7x27a_U8655_EMMC()
     || machine_is_msm7x27a_H867G()
-    || machine_is_msm7x27a_H868C() )
+    || machine_is_msm7x27a_H868C())
     {
-        ret = HW_MIRROR_AND_FLIP;
+        /*back camera should mirror and flip*/
+        ret |= HW_MIRROR_AND_FLIP;
     }
-    else
+    if(machine_is_msm8x25_U8951()
+    ||machine_is_msm8x25_U8951D())
     {
-      ret = HW_NOT_MIRROR_OR_FLIP;
+        /*front camera should mirror and flip*/
+        ret |= HW_MIRROR_AND_FLIP << 1;
     }
   return ret;
 }
@@ -1562,7 +1712,34 @@ char *get_touch_info(void)
 
 	return NULL;
 }
-
+/*4pin battery voltage id*/
+char* get_battery_manufacturer_info()
+{
+	hw_battery_id_mv batt_id;
+	char *pmanufacturer_name = "Unknown battery";
+	batt_id = get_battery_resistance_id();
+	switch (batt_id)
+	{
+	case BATTERY_RESISTANCE_MV_10:
+		pmanufacturer_name = "BYD";
+		break;	
+	case BATTERY_RESISTANCE_MV_22:
+		pmanufacturer_name = "GY";
+		break;
+	case BATTERY_RESISTANCE_MV_40:
+		pmanufacturer_name = "LS";
+		break;
+	case BATTERY_RESISTANCE_MV_110_1:
+		pmanufacturer_name = "MAX";
+		break;
+	case BATTERY_RESISTANCE_MV_470_1:
+		pmanufacturer_name = "SAN";
+		break;
+	default:
+		break;
+	}
+	return pmanufacturer_name;
+}
 hw_camera_flash_number get_hw_camera_flash_number(void)
 {
     hw_camera_flash_number ret = CAMERA_FLASH_LED_SINGLE;

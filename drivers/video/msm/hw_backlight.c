@@ -31,11 +31,11 @@
 #define PM_GPIO26_PWM_ID  2
 #define ADD_VALUE			4
 #define PWM_LEVEL_ADJUST	226
-#define BL_MIN_LEVEL 	    30
+/*modify the min value*/
+#define BL_MIN_LEVEL 13
 
-/*LPG CTL MACRO  range 0 to 100*/
-#define PWM_LEVEL_ADJUST_LPG	100
-#define BL_MIN_LEVEL_LPG 	    10
+
+/* delete 2 lines about PWM_LEVEL_ADJUST_LPG and BL_MIN_LEVEL_LPG */
 /* move semaphore to msm_fb.c */
 static struct msm_fb_data_type *mfd_local;
 static boolean backlight_set = FALSE;
@@ -100,10 +100,9 @@ void msm_backlight_set(int level)
 #ifdef CONFIG_ARCH_MSM7X27A
 	if(level)
 	{
-		level = ((level * PWM_LEVEL_ADJUST_LPG) / PWM_LEVEL ); 
-		if (level < BL_MIN_LEVEL_LPG)        
+		if (level < BL_MIN_LEVEL)        
 		{    
-			level = BL_MIN_LEVEL_LPG;      
+			level = BL_MIN_LEVEL;      
 		}
 	}
     if (last_level == level)
@@ -236,6 +235,13 @@ static void pwm_backlight_resume( struct early_suspend *h)
 				down(&mfd_local->sem);
 				pwm_set_backlight(mfd_local);
 				up(&mfd_local->sem);
+				up(&mfd_local->dma->mutex);
+			}
+			/*add mipi video interface*/
+			else if(get_hw_lcd_interface_type() == LCD_IS_MIPI_VIDEO)
+			{
+				down(&mfd_local->dma->mutex);
+				pwm_set_backlight(mfd_local);
 				up(&mfd_local->dma->mutex);
 			}
 			/* MDDI don't use semaphore */

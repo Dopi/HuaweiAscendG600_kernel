@@ -20,7 +20,6 @@
 #include <sound/core.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
-#include <sound/soc-dsp.h>
 #include <sound/pcm.h>
 #include <sound/jack.h>
 #include <asm/mach-types.h>
@@ -40,8 +39,8 @@
 #define MDM9615_SLIM_0_RX_MAX_CHANNELS		2
 #define MDM9615_SLIM_0_TX_MAX_CHANNELS		4
 
-#define BTSCO_RATE_8KHZ 8000
-#define BTSCO_RATE_16KHZ 16000
+#define SAMPLE_RATE_8KHZ 8000
+#define SAMPLE_RATE_16KHZ 16000
 
 #define BOTTOM_SPK_AMP_POS	0x1
 #define BOTTOM_SPK_AMP_NEG	0x2
@@ -189,9 +188,6 @@ static int msm9615_i2s_spk_control;
 #define LPAIF_SPARE_MUX_CTL_PRI_MUX_SEL_BMSK	0x3
 #define LPAIF_SPARE_MUX_CTL_PRI_MUX_SEL_SHFT		0x0
 
-static u32 spare_shadow;
-static u32 sif_shadow;
-
 static atomic_t msm9615_auxpcm_ref;
 static atomic_t msm9615_sec_auxpcm_ref;
 
@@ -262,8 +258,10 @@ static int mdm9615_ext_top_spk_pamp;
 static int mdm9615_slim_0_rx_ch = 1;
 static int mdm9615_slim_0_tx_ch = 1;
 
-static int mdm9615_btsco_rate = BTSCO_RATE_8KHZ;
+static int mdm9615_btsco_rate = SAMPLE_RATE_8KHZ;
 static int mdm9615_btsco_ch = 1;
+
+static int mdm9615_auxpcm_rate = SAMPLE_RATE_8KHZ;
 
 static struct clk *codec_clk;
 static int clk_users;
@@ -680,6 +678,11 @@ static const struct soc_enum mdm9615_btsco_enum[] = {
 		SOC_ENUM_SINGLE_EXT(2, btsco_rate_text),
 };
 
+static const char * const auxpcm_rate_text[] = {"rate_8000", "rate_16000"};
+static const struct soc_enum mdm9615_auxpcm_enum[] = {
+		SOC_ENUM_SINGLE_EXT(2, auxpcm_rate_text),
+};
+
 static int mdm9615_slim_0_rx_ch_get(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
@@ -731,16 +734,46 @@ static int mdm9615_btsco_rate_put(struct snd_kcontrol *kcontrol,
 {
 	switch (ucontrol->value.integer.value[0]) {
 	case 0:
-		mdm9615_btsco_rate = BTSCO_RATE_8KHZ;
+		mdm9615_btsco_rate = SAMPLE_RATE_8KHZ;
 		break;
 	case 1:
-		mdm9615_btsco_rate = BTSCO_RATE_16KHZ;
+		mdm9615_btsco_rate = SAMPLE_RATE_16KHZ;
 		break;
 	default:
-		mdm9615_btsco_rate = BTSCO_RATE_8KHZ;
+		mdm9615_btsco_rate = SAMPLE_RATE_8KHZ;
 		break;
 	}
 	pr_debug("%s: mdm9615_btsco_rate = %d\n", __func__, mdm9615_btsco_rate);
+	return 0;
+}
+
+static int mdm9615_auxpcm_rate_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	pr_debug("%s: mdm9615_auxpcm_rate  = %d", __func__,
+		mdm9615_auxpcm_rate);
+	ucontrol->value.integer.value[0] = mdm9615_auxpcm_rate;
+	return 0;
+}
+
+static int mdm9615_auxpcm_rate_put(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	switch (ucontrol->value.integer.value[0]) {
+	case 0:
+		mdm9615_auxpcm_rate = SAMPLE_RATE_8KHZ;
+		break;
+	case 1:
+		mdm9615_auxpcm_rate = SAMPLE_RATE_16KHZ;
+		break;
+	default:
+		mdm9615_auxpcm_rate = SAMPLE_RATE_8KHZ;
+		break;
+	}
+	pr_debug("%s: mdm9615_auxpcm_rate = %d\n"
+		 "ucontrol->value.integer.value[0] = %d\n", __func__,
+		 mdm9615_auxpcm_rate,
+		 (int)ucontrol->value.integer.value[0]);
 	return 0;
 }
 
@@ -751,25 +784,11 @@ static const struct snd_kcontrol_new tabla_mdm9615_controls[] = {
 		mdm9615_slim_0_rx_ch_get, mdm9615_slim_0_rx_ch_put),
 	SOC_ENUM_EXT("SLIM_0_TX Channels", mdm9615_enum[2],
 		mdm9615_slim_0_tx_ch_get, mdm9615_slim_0_tx_ch_put),
-};
-
-static const struct snd_kcontrol_new int_btsco_rate_mixer_controls[] = {
 	SOC_ENUM_EXT("Internal BTSCO SampleRate", mdm9615_btsco_enum[0],
-		mdm9615_btsco_rate_get, mdm9615_btsco_rate_put),
+		     mdm9615_btsco_rate_get, mdm9615_btsco_rate_put),
+	SOC_ENUM_EXT("AUX PCM SampleRate", mdm9615_auxpcm_enum[0],
+		mdm9615_auxpcm_rate_get, mdm9615_auxpcm_rate_put),
 };
-
-static int mdm9615_btsco_init(struct snd_soc_pcm_runtime *rtd)
-{
-	int err = 0;
-	struct snd_soc_platform *platform = rtd->platform;
-
-	err = snd_soc_add_platform_controls(platform,
-			int_btsco_rate_mixer_controls,
-		ARRAY_SIZE(int_btsco_rate_mixer_controls));
-	if (err < 0)
-		return err;
-	return 0;
-}
 
 static void *def_tabla_mbhc_cal(void)
 {
@@ -981,12 +1000,6 @@ static int msm9615_i2s_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_soc_codec *codec = rtd->codec;
 	struct snd_soc_dapm_context *dapm = &codec->dapm;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-	err = snd_soc_add_controls(codec, tabla_msm9615_i2s_controls,
-		ARRAY_SIZE(tabla_msm9615_i2s_controls));
-	if (err < 0) {
-		pr_err("returning loc 1 err = %d\n", err);
-		return err;
-	}
 
 	snd_soc_dapm_new_controls(dapm, mdm9615_dapm_widgets,
 				  ARRAY_SIZE(mdm9615_dapm_widgets));
@@ -1050,30 +1063,26 @@ static int mdm9615_i2s_free_gpios(u8 i2s_intf, u8 i2s_dir)
 {
 	struct msm_i2s_ctl *pintf = &msm9x15_i2s_ctl;
 	if (i2s_intf == MSM_INTF_PRIM) {
-		if (i2s_dir == MSM_DIR_RX)
-			gpio_free(GPIO_PRIM_I2S_DOUT);
-		if (i2s_dir == MSM_DIR_TX)
-			gpio_free(GPIO_PRIM_I2S_DIN);
 		if (pintf->intf_status[i2s_intf][MSM_DIR_TX] == 0 &&
 			pintf->intf_status[i2s_intf][MSM_DIR_RX] == 0) {
+			gpio_free(GPIO_PRIM_I2S_DIN);
+			gpio_free(GPIO_PRIM_I2S_DOUT);
 			gpio_free(GPIO_PRIM_I2S_SCK);
 			gpio_free(GPIO_PRIM_I2S_WS);
 		}
 	} else if (i2s_intf == MSM_INTF_SECN) {
-		if (i2s_dir == MSM_DIR_RX)
-			gpio_free(GPIO_SEC_I2S_DOUT);
-		if (i2s_dir == MSM_DIR_TX)
-			gpio_free(GPIO_SEC_I2S_DIN);
 		if (pintf->intf_status[i2s_intf][MSM_DIR_TX] == 0 &&
 			pintf->intf_status[i2s_intf][MSM_DIR_RX] == 0) {
+			gpio_free(GPIO_SEC_I2S_DOUT);
 			gpio_free(GPIO_SEC_I2S_WS);
+			gpio_free(GPIO_SEC_I2S_DIN);
 			gpio_free(GPIO_SEC_I2S_SCK);
 		}
 	}
 	return 0;
 }
 
-int msm9615_i2s_intf_dir_sel(const char *cpu_dai_name,
+static int msm9615_i2s_intf_dir_sel(const char *cpu_dai_name,
 			     u8 *i2s_intf, u8 *i2s_dir)
 {
 	int ret = 0;
@@ -1101,34 +1110,37 @@ err:
 	return ret;
 }
 
-int msm9615_enable_i2s_gpio(u8 i2s_intf, u8 i2s_dir)
+static int msm9615_enable_i2s_gpio(u8 i2s_intf, u8 i2s_dir)
 {
 	u8 ret = 0;
 	struct msm_i2s_ctl *pintf = &msm9x15_i2s_ctl;
+
 	if (i2s_intf == MSM_INTF_PRIM) {
-		if (i2s_dir == MSM_DIR_TX) {
+		if (pintf->intf_status[i2s_intf][MSM_DIR_TX] == 0 &&
+		    pintf->intf_status[i2s_intf][MSM_DIR_RX] == 0) {
+
+			ret = gpio_request(GPIO_PRIM_I2S_DOUT,
+					   "I2S_PRIM_DOUT");
+			if (ret) {
+				pr_err("%s: Failed to request gpio %d\n",
+					__func__, GPIO_PRIM_I2S_DOUT);
+				goto err;
+			}
+
 			ret = gpio_request(GPIO_PRIM_I2S_DIN, "I2S_PRIM_DIN");
 			if (ret) {
 				pr_err("%s: Failed to request gpio %d\n",
-				       __func__, GPIO_PRIM_I2S_DIN);
+					       __func__, GPIO_PRIM_I2S_DIN);
 				goto err;
 			}
-		} else if (i2s_dir == MSM_DIR_RX) {
-			ret = gpio_request(GPIO_PRIM_I2S_DOUT,
-					       "I2S_PRIM_DOUT");
-			if (ret) {
-				pr_err("%s: Failed to request gpio %d\n",
-				       __func__, GPIO_PRIM_I2S_DOUT);
-				goto err;
-			}
-		} else if (pintf->intf_status[i2s_intf][MSM_DIR_TX] == 0 &&
-			   pintf->intf_status[i2s_intf][MSM_DIR_RX] == 0) {
+
 			ret = gpio_request(GPIO_PRIM_I2S_SCK, "I2S_PRIM_SCK");
 			if (ret) {
 				pr_err("%s: Failed to request gpio %d\n",
 				       __func__, GPIO_PRIM_I2S_SCK);
 				goto err;
 			}
+
 			ret = gpio_request(GPIO_PRIM_I2S_WS, "I2S_PRIM_WS");
 			if (ret) {
 				pr_err("%s: Failed to request gpio %d\n",
@@ -1137,28 +1149,30 @@ int msm9615_enable_i2s_gpio(u8 i2s_intf, u8 i2s_dir)
 			}
 		}
 	} else if (i2s_intf == MSM_INTF_SECN) {
-		if (i2s_dir == MSM_DIR_RX) {
-			ret = gpio_request(GPIO_SEC_I2S_DOUT, "I2S_SEC_DOUT");
-			if (ret) {
-				pr_err("%s: Failed to request gpio %d\n",
-				       __func__, GPIO_SEC_I2S_DOUT);
-				goto err;
-			}
-		} else if (i2s_dir == MSM_DIR_TX) {
+		if (pintf->intf_status[i2s_intf][MSM_DIR_TX] == 0 &&
+		    pintf->intf_status[i2s_intf][MSM_DIR_RX] == 0) {
+
 			ret = gpio_request(GPIO_SEC_I2S_DIN, "I2S_SEC_DIN");
 			if (ret) {
 				pr_err("%s: Failed to request gpio %d\n",
 				       __func__, GPIO_SEC_I2S_DIN);
 				goto err;
 			}
-		} else if (pintf->intf_status[i2s_intf][MSM_DIR_TX] == 0 &&
-			   pintf->intf_status[i2s_intf][MSM_DIR_RX] == 0) {
+
+			ret = gpio_request(GPIO_SEC_I2S_DOUT, "I2S_SEC_DOUT");
+			if (ret) {
+				pr_err("%s: Failed to request gpio %d\n",
+				       __func__, GPIO_SEC_I2S_DOUT);
+				goto err;
+			}
+
 			ret = gpio_request(GPIO_SEC_I2S_SCK, "I2S_SEC_SCK");
 			if (ret) {
 				pr_err("%s: Failed to request gpio %d\n",
 				       __func__, GPIO_SEC_I2S_SCK);
 				goto err;
 			}
+
 			ret = gpio_request(GPIO_SEC_I2S_WS, "I2S_SEC_WS");
 			if (ret) {
 				pr_err("%s: Failed to request gpio %d\n",
@@ -1267,20 +1281,33 @@ err:
 	return ret;
 }
 
-void msm9615_config_i2s_sif_mux(u8 value)
+static void msm9615_config_i2s_sif_mux(u8 value)
 {
 	struct msm_i2s_ctl *pintf = &msm9x15_i2s_ctl;
-	sif_shadow  = 0x00000;
+	u32 sif_shadow  = 0x0000;
+	/* Make this variable global if both secondary and
+	 * primary needs to be supported. This is required
+	 * to retain bits in interace and set only specific
+	 * bits in the register. Also set Sec Intf bits.
+	 * Secondary interface bits are 0,1.
+	 **/
 	sif_shadow = (sif_shadow & LPASS_SIF_MUX_CTL_PRI_MUX_SEL_BMSK) |
 		     (value << LPASS_SIF_MUX_CTL_PRI_MUX_SEL_SHFT);
-	iowrite32(sif_shadow, pintf->sif_virt_addr);
+	if (pintf->sif_virt_addr != NULL)
+		iowrite32(sif_shadow, pintf->sif_virt_addr);
 	/* Dont read SIF register. Device crashes. */
 	pr_debug("%s() SIF Reg = 0x%x\n", __func__, sif_shadow);
 }
 
-void msm9615_config_i2s_spare_mux(u8 value, u8 i2s_intf)
+static void msm9615_config_i2s_spare_mux(u8 value, u8 i2s_intf)
 {
 	struct msm_i2s_ctl *pintf = &msm9x15_i2s_ctl;
+	u32 spare_shadow = 0x0000;
+	/* Make this variable global if both secondary and
+	 * primary needs to be supported. This is required
+	 * to retain bits in interace and set only specific
+	 * bits in the register. Also set Sec Intf bits.
+	 **/
 	if (i2s_intf == MSM_INTF_PRIM) {
 		/* Configure Primary SIF */
 	    spare_shadow = (spare_shadow & LPAIF_SPARE_MUX_CTL_PRI_MUX_SEL_BMSK
@@ -1291,7 +1318,8 @@ void msm9615_config_i2s_spare_mux(u8 value, u8 i2s_intf)
 	    spare_shadow = (spare_shadow & LPAIF_SPARE_MUX_CTL_SEC_MUX_SEL_BMSK
 			   ) | (value << LPAIF_SPARE_MUX_CTL_SEC_MUX_SEL_SHFT);
 	}
-	iowrite32(spare_shadow, pintf->spare_virt_addr);
+	if (pintf->spare_virt_addr != NULL)
+		iowrite32(spare_shadow, pintf->spare_virt_addr);
 	/* Dont read SPARE register. Device crashes. */
 	pr_debug("%s( ): SPARE Reg =0x%x\n", __func__, spare_shadow);
 }
@@ -1486,10 +1514,6 @@ static int mdm9615_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	pr_debug("%s(), dev_name%s\n", __func__, dev_name(cpu_dai->dev));
 
 	rtd->pmdown_time = 0;
-	err = snd_soc_add_controls(codec, tabla_mdm9615_controls,
-				ARRAY_SIZE(tabla_mdm9615_controls));
-	if (err < 0)
-		return err;
 
 	snd_soc_dapm_new_controls(dapm, mdm9615_dapm_widgets,
 				ARRAY_SIZE(mdm9615_dapm_widgets));
@@ -1525,25 +1549,6 @@ static int mdm9615_audrx_init(struct snd_soc_pcm_runtime *rtd)
 
 	return err;
 }
-
-static struct snd_soc_dsp_link fe_media = {
-	.playback = true,
-	.capture = true,
-	.trigger = {
-		SND_SOC_DSP_TRIGGER_POST,
-		SND_SOC_DSP_TRIGGER_POST
-	},
-};
-
-/* bi-directional media definition for hostless PCM device */
-static struct snd_soc_dsp_link bidir_hl_media = {
-	.playback = true,
-	.capture = true,
-	.trigger = {
-		SND_SOC_DSP_TRIGGER_POST,
-		SND_SOC_DSP_TRIGGER_POST
-	},
-};
 
 static int mdm9615_slim_0_rx_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 			struct snd_pcm_hw_params *params)
@@ -1600,8 +1605,8 @@ static int mdm9615_auxpcm_be_params_fixup(struct snd_soc_pcm_runtime *rtd,
 	struct snd_interval *channels = hw_param_interval(params,
 					SNDRV_PCM_HW_PARAM_CHANNELS);
 
-	/* PCM only supports mono output with 8khz sample rate */
-	rate->min = rate->max = 8000;
+	rate->min = rate->max = mdm9615_auxpcm_rate;
+	/* PCM only supports mono output */
 	channels->min = channels->max = 1;
 
 	return 0;
@@ -1826,7 +1831,10 @@ static struct snd_soc_dai_link mdm9615_dai_common[] = {
 		.cpu_dai_name	= "MultiMedia1",
 		.platform_name  = "msm-pcm-dsp",
 		.dynamic = 1,
-		.dsp_link = &fe_media,
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_suspend = 1,
 		.be_id = MSM_FRONTEND_DAI_MULTIMEDIA1
 	},
 	{
@@ -1835,7 +1843,10 @@ static struct snd_soc_dai_link mdm9615_dai_common[] = {
 		.cpu_dai_name	= "MultiMedia2",
 		.platform_name  = "msm-pcm-dsp",
 		.dynamic = 1,
-		.dsp_link = &fe_media,
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_suspend = 1,
 		.be_id = MSM_FRONTEND_DAI_MULTIMEDIA2,
 	},
 	{
@@ -1844,7 +1855,10 @@ static struct snd_soc_dai_link mdm9615_dai_common[] = {
 		.cpu_dai_name   = "CS-VOICE",
 		.platform_name  = "msm-pcm-voice",
 		.dynamic = 1,
-		.dsp_link = &fe_media,
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_suspend = 1,
 		.be_id = MSM_FRONTEND_DAI_CS_VOICE,
 		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
 		.ignore_suspend = 1,
@@ -1855,7 +1869,10 @@ static struct snd_soc_dai_link mdm9615_dai_common[] = {
 		.cpu_dai_name	= "VoIP",
 		.platform_name  = "msm-voip-dsp",
 		.dynamic = 1,
-		.dsp_link = &fe_media,
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_suspend = 1,
 		.be_id = MSM_FRONTEND_DAI_VOIP,
 	},
 	/* Hostless PMC purpose */
@@ -1865,7 +1882,9 @@ static struct snd_soc_dai_link mdm9615_dai_common[] = {
 		.cpu_dai_name	= "SLIMBUS0_HOSTLESS",
 		.platform_name  = "msm-pcm-hostless",
 		.dynamic = 1,
-		.dsp_link = &bidir_hl_media,
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
 		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
 		.ignore_suspend = 1,
 		/* .be_id = do not care */
@@ -1894,7 +1913,9 @@ static struct snd_soc_dai_link mdm9615_dai_common[] = {
 		.cpu_dai_name	= "AUXPCM_HOSTLESS",
 		.platform_name  = "msm-pcm-hostless",
 		.dynamic = 1,
-		.dsp_link = &bidir_hl_media,
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
 		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
 		.ignore_suspend = 1,
 	},
@@ -1904,7 +1925,9 @@ static struct snd_soc_dai_link mdm9615_dai_common[] = {
 		.cpu_dai_name   = "VoLTE",
 		.platform_name  = "msm-pcm-voice",
 		.dynamic = 1,
-		.dsp_link = &fe_media,
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
 		.be_id = MSM_FRONTEND_DAI_VOLTE,
 		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
 		.ignore_suspend = 1,
@@ -1917,7 +1940,6 @@ static struct snd_soc_dai_link mdm9615_dai_common[] = {
 		.platform_name = "msm-pcm-routing",
 		.codec_name = "msm-stub-codec.1",
 		.codec_dai_name	= "msm-stub-rx",
-		.init = &mdm9615_btsco_init,
 		.no_pcm = 1,
 		.be_id = MSM_BACKEND_DAI_INT_BT_SCO_RX,
 		.be_hw_params_fixup = mdm9615_btsco_be_hw_params_fixup,
@@ -1942,7 +1964,6 @@ static struct snd_soc_dai_link mdm9615_dai_common[] = {
 		.platform_name = "msm-pcm-routing",
 		.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-rx",
-		.no_codec = 1,
 		.no_pcm = 1,
 		.be_id = MSM_BACKEND_DAI_AFE_PCM_RX,
 	},
@@ -1953,7 +1974,6 @@ static struct snd_soc_dai_link mdm9615_dai_common[] = {
 		.platform_name = "msm-pcm-routing",
 		.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-tx",
-		.no_codec = 1,
 		.no_pcm = 1,
 		.be_id = MSM_BACKEND_DAI_AFE_PCM_TX,
 	},
@@ -2079,6 +2099,8 @@ static struct snd_soc_dai_link mdm9615_slimbus_dai[
 
 static struct snd_soc_card snd_soc_card_mdm9615 = {
 		.name		= "mdm9615-tabla-snd-card",
+		.controls = tabla_mdm9615_controls,
+		.num_controls = ARRAY_SIZE(tabla_mdm9615_controls),
 };
 
 static struct platform_device *mdm9615_snd_device;
@@ -2204,6 +2226,9 @@ static int __init mdm9615_audio_init(void)
 	atomic_set(&msm9615_sec_auxpcm_ref, 0);
 	msm9x15_i2s_ctl.sif_virt_addr = ioremap(LPASS_SIF_MUX_ADDR, 4);
 	msm9x15_i2s_ctl.spare_virt_addr = ioremap(LPAIF_SPARE_ADDR, 4);
+	if (msm9x15_i2s_ctl.spare_virt_addr == NULL ||
+	    msm9x15_i2s_ctl.sif_virt_addr == NULL)
+		pr_err("%s: SIF or Spare ptr are NULL", __func__);
 	sif_virt_addr = ioremap(LPASS_SIF_MUX_ADDR, 4);
 	secpcm_portslc_virt_addr = ioremap(SEC_PCM_PORT_SLC_ADDR, 4);
 

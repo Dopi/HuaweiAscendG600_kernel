@@ -38,12 +38,14 @@ struct adm_ctl {
 	atomic_t copp_cnt[AFE_MAX_PORTS];
 	atomic_t copp_stat[AFE_MAX_PORTS];
 	wait_queue_head_t wait;
+	int  ec_ref_rx;
 };
 
 static struct acdb_cal_block mem_addr_audproc[MAX_AUDPROC_TYPES];
 static struct acdb_cal_block mem_addr_audvol[MAX_AUDPROC_TYPES];
 
 static struct adm_ctl			this_adm;
+
 
 int srs_trumedia_open(int port_id, int srs_tech_id, void *srs_params)
 {
@@ -278,6 +280,7 @@ static int32_t adm_callback(struct apr_client_data *data, void *priv)
 			case ADM_CMD_MEMORY_UNMAP_REGIONS:
 			case ADM_CMD_MATRIX_MAP_ROUTINGS:
 			case ADM_CMD_CONNECT_AFE_PORT:
+			case ADM_CMD_DISCONNECT_AFE_PORT:
 				atomic_set(&this_adm.copp_stat[index], 1);
 				wake_up(&this_adm.wait);
 				break;
@@ -523,6 +526,76 @@ fail_cmd:
 	return ret;
 }
 
+int adm_disconnect_afe_port(int mode, int session_id, int port_id)
+{
+	struct adm_cmd_connect_afe_port	cmd;
+	int ret = 0;
+	int index;
+
+	pr_debug("%s: port %d session id:%d mode:%d\n", __func__,
+				port_id, session_id, mode);
+
+	port_id = afe_convert_virtual_to_portid(port_id);
+
+	if (afe_validate_port(port_id) < 0) {
+		pr_err("%s port idi[%d] is invalid\n", __func__, port_id);
+		return -ENODEV;
+	}
+	if (this_adm.apr == NULL) {
+		this_adm.apr = apr_register("ADSP", "ADM", adm_callback,
+						0xFFFFFFFF, &this_adm);
+		if (this_adm.apr == NULL) {
+			pr_err("%s: Unable to register ADM\n", __func__);
+			ret = -ENODEV;
+			return ret;
+		}
+		rtac_set_adm_handle(this_adm.apr);
+	}
+	index = afe_get_port_index(port_id);
+	pr_debug("%s: Port ID %d, index %d\n", __func__, port_id, index);
+
+	cmd.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+			APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+	cmd.hdr.pkt_size = sizeof(cmd);
+	cmd.hdr.src_svc = APR_SVC_ADM;
+	cmd.hdr.src_domain = APR_DOMAIN_APPS;
+	cmd.hdr.src_port = port_id;
+	cmd.hdr.dest_svc = APR_SVC_ADM;
+	cmd.hdr.dest_domain = APR_DOMAIN_ADSP;
+	cmd.hdr.dest_port = port_id;
+	cmd.hdr.token = port_id;
+	cmd.hdr.opcode = ADM_CMD_DISCONNECT_AFE_PORT;
+
+	cmd.mode = mode;
+	cmd.session_id = session_id;
+	cmd.afe_port_id = port_id;
+
+	atomic_set(&this_adm.copp_stat[index], 0);
+	ret = apr_send_pkt(this_adm.apr, (uint32_t *)&cmd);
+	if (ret < 0) {
+		pr_err("%s:ADM enable for port %d failed\n",
+					__func__, port_id);
+		ret = -EINVAL;
+		goto fail_cmd;
+	}
+	/* Wait for the callback with copp id */
+	ret = wait_event_timeout(this_adm.wait,
+		atomic_read(&this_adm.copp_stat[index]),
+		msecs_to_jiffies(TIMEOUT_MS));
+	if (!ret) {
+		pr_err("%s ADM connect AFE failed for port %d\n", __func__,
+							port_id);
+		ret = -EINVAL;
+		goto fail_cmd;
+	}
+	atomic_dec(&this_adm.copp_cnt[index]);
+	return 0;
+
+fail_cmd:
+
+	return ret;
+}
+
 int adm_open(int port_id, int path, int rate, int channel_mode, int topology)
 {
 	struct adm_copp_open_command	open;
@@ -571,8 +644,16 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology)
 
 		open.mode = path;
 		open.endpoint_id1 = port_id;
-		open.endpoint_id2 = 0xFFFF;
 
+		if (this_adm.ec_ref_rx == 0) {
+			open.endpoint_id2 = 0xFFFF;
+		} else if (this_adm.ec_ref_rx && (path != 1)) {
+				open.endpoint_id2 = this_adm.ec_ref_rx;
+				this_adm.ec_ref_rx = 0;
+		}
+
+		pr_debug("%s open.endpoint_id1:%d open.endpoint_id2:%d",
+			__func__, open.endpoint_id1, open.endpoint_id2);
 		/* convert path to acdb path */
 		if (path == ADM_PATH_PLAYBACK)
 			open.topology_id = get_adm_rx_topology();
@@ -684,6 +765,15 @@ int adm_multi_ch_copp_open(int port_id, int path, int rate, int channel_mode,
 			open.dev_channel_mapping[3] = PCM_CHANNEL_FC;
 			open.dev_channel_mapping[4] = PCM_CHANNEL_LB;
 			open.dev_channel_mapping[5] = PCM_CHANNEL_RB;
+		} else if (channel_mode == 8) {
+			open.dev_channel_mapping[0] = PCM_CHANNEL_FL;
+			open.dev_channel_mapping[1] = PCM_CHANNEL_FR;
+			open.dev_channel_mapping[2] = PCM_CHANNEL_LFE;
+			open.dev_channel_mapping[3] = PCM_CHANNEL_FC;
+			open.dev_channel_mapping[4] = PCM_CHANNEL_LB;
+			open.dev_channel_mapping[5] = PCM_CHANNEL_RB;
+			open.dev_channel_mapping[6] = PCM_CHANNEL_FLC;
+			open.dev_channel_mapping[7] = PCM_CHANNEL_FRC;
 		} else {
 			pr_err("%s invalid num_chan %d\n", __func__,
 					channel_mode);
@@ -701,8 +791,16 @@ int adm_multi_ch_copp_open(int port_id, int path, int rate, int channel_mode,
 
 		open.mode = path;
 		open.endpoint_id1 = port_id;
-		open.endpoint_id2 = 0xFFFF;
 
+		if (this_adm.ec_ref_rx == 0) {
+			open.endpoint_id2 = 0xFFFF;
+		} else if (this_adm.ec_ref_rx && (path != 1)) {
+				open.endpoint_id2 = this_adm.ec_ref_rx;
+				this_adm.ec_ref_rx = 0;
+		}
+
+		pr_debug("%s open.endpoint_id1:%d open.endpoint_id2:%d",
+			__func__, open.endpoint_id1, open.endpoint_id2);
 		/* convert path to acdb path */
 		if (path == ADM_PATH_PLAYBACK)
 			open.topology_id = get_adm_rx_topology();
@@ -1000,6 +1098,12 @@ int adm_get_copp_id(int port_index)
 	}
 
 	return atomic_read(&this_adm.copp_id[port_index]);
+}
+
+void adm_ec_ref_rx_id(int  port_id)
+{
+	this_adm.ec_ref_rx = port_id;
+	pr_debug("%s ec_ref_rx:%d", __func__, this_adm.ec_ref_rx);
 }
 
 int adm_close(int port_id)

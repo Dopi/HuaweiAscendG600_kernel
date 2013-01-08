@@ -11,6 +11,7 @@
  * GNU General Public License for more details.
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/leds-pmic8058.h>
@@ -50,7 +51,6 @@ static struct  pm_gpio camera_flash = {
 		.inv_int_pol 	= 1,
 	};
 #endif
-
 struct timer_list timer_flash;
 static struct msm_camera_sensor_info *sensor_data;
 enum msm_cam_flash_stat{

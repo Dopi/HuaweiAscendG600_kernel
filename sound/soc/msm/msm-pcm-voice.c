@@ -59,6 +59,14 @@ static int is_volte(struct msm_voice *pvolte)
 		return false;
 }
 
+static int is_sglte(struct msm_voice *psglte)
+{
+	if (psglte == &voice_info[SGLTE_SESSION_INDEX])
+		return true;
+	else
+		return false;
+}
+
 static int msm_pcm_playback_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
@@ -92,6 +100,10 @@ static int msm_pcm_open(struct snd_pcm_substream *substream)
 	if (!strncmp("VoLTE", substream->pcm->id, 5)) {
 		voice = &voice_info[VOLTE_SESSION_INDEX];
 		pr_debug("%s: Open VoLTE Substream Id=%s\n",
+				__func__, substream->pcm->id);
+	} else if (!strncmp("SGLTE", substream->pcm->id, 5)) {
+		voice = &voice_info[SGLTE_SESSION_INDEX];
+		pr_debug("%s: Open SGLTE Substream Id=%s\n",
 				__func__, substream->pcm->id);
 	} else {
 		voice = &voice_info[VOICE_SESSION_INDEX];
@@ -162,6 +174,8 @@ static int msm_pcm_close(struct snd_pcm_substream *substream)
 		pr_debug("end voice call\n");
 		if (is_volte(prtd))
 			session_id = voc_get_session_id(VOLTE_SESSION_NAME);
+		else if (is_sglte(prtd))
+			session_id = voc_get_session_id(SGLTE_SESSION_NAME);
 		else
 			session_id = voc_get_session_id(VOICE_SESSION_NAME);
 		voc_end_voice_call(session_id);
@@ -187,6 +201,8 @@ static int msm_pcm_prepare(struct snd_pcm_substream *substream)
 	if (prtd->playback_start && prtd->capture_start) {
 		if (is_volte(prtd))
 			session_id = voc_get_session_id(VOLTE_SESSION_NAME);
+		else if (is_sglte(prtd))
+			session_id = voc_get_session_id(SGLTE_SESSION_NAME);
 		else
 			session_id = voc_get_session_id(VOICE_SESSION_NAME);
 		voc_start_voice_call(session_id);
@@ -217,6 +233,8 @@ static int msm_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	pr_debug("%s: cmd = %d\n", __func__, cmd);
 	if (is_volte(prtd))
 		session_id = voc_get_session_id(VOLTE_SESSION_NAME);
+	else if (is_sglte(prtd))
+		session_id = voc_get_session_id(SGLTE_SESSION_NAME);
 	else
 		session_id = voc_get_session_id(VOICE_SESSION_NAME);
 
@@ -290,6 +308,23 @@ static int msm_volte_volume_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int msm_sglte_volume_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = 0;
+	return 0;
+}
+
+static int msm_sglte_volume_put(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	int volume = ucontrol->value.integer.value[0];
+	pr_debug("%s: volume: %d\n", __func__, volume);
+	voc_set_rx_vol_index(voc_get_session_id(SGLTE_SESSION_NAME),
+						RX_PATH, volume);
+	return 0;
+}
+
 static int msm_voice_mute_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
@@ -324,6 +359,25 @@ static int msm_volte_mute_put(struct snd_kcontrol *kcontrol,
 	pr_debug("%s: mute=%d\n", __func__, mute);
 
 	voc_set_tx_mute(voc_get_session_id(VOLTE_SESSION_NAME), TX_PATH, mute);
+
+	return 0;
+}
+
+static int msm_sglte_mute_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = 0;
+	return 0;
+}
+
+static int msm_sglte_mute_put(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	int mute = ucontrol->value.integer.value[0];
+
+	pr_debug("%s: mute=%d\n", __func__, mute);
+
+	voc_set_tx_mute(voc_get_session_id(SGLTE_SESSION_NAME), TX_PATH, mute);
 
 	return 0;
 }
@@ -368,6 +422,26 @@ static int msm_volte_rx_device_mute_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int msm_sglte_rx_device_mute_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] =
+		voc_get_rx_device_mute(voc_get_session_id(SGLTE_SESSION_NAME));
+	return 0;
+}
+
+static int msm_sglte_rx_device_mute_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	int mute = ucontrol->value.integer.value[0];
+
+	pr_debug("%s: mute=%d\n", __func__, mute);
+
+	voc_set_rx_device_mute(voc_get_session_id(SGLTE_SESSION_NAME), mute);
+
+	return 0;
+}
+
 static const char const *tty_mode[] = {"OFF", "HCO", "VCO", "FULL"};
 static const struct soc_enum msm_tty_mode_enum[] = {
 		SOC_ENUM_SINGLE_EXT(4, tty_mode),
@@ -390,6 +464,7 @@ static int msm_voice_tty_mode_put(struct snd_kcontrol *kcontrol,
 
 	voc_set_tty_mode(voc_get_session_id(VOICE_SESSION_NAME), tty_mode);
 
+	voc_set_tty_mode(voc_get_session_id(SGLTE_SESSION_NAME), tty_mode);
 	return 0;
 }
 static int msm_voice_widevoice_put(struct snd_kcontrol *kcontrol,
@@ -401,7 +476,8 @@ static int msm_voice_widevoice_put(struct snd_kcontrol *kcontrol,
 
 	voc_set_widevoice_enable(voc_get_session_id(VOICE_SESSION_NAME),
 				 wv_enable);
-
+	voc_set_widevoice_enable(voc_get_session_id(SGLTE_SESSION_NAME),
+				 wv_enable);
 	return 0;
 }
 
@@ -422,6 +498,8 @@ static int msm_voice_slowtalk_put(struct snd_kcontrol *kcontrol,
 	pr_debug("%s: st enable=%d\n", __func__, st_enable);
 
 	voc_set_pp_enable(voc_get_session_id(VOICE_SESSION_NAME),
+			MODULE_ID_VOICE_MODULE_ST, st_enable);
+	voc_set_pp_enable(voc_get_session_id(SGLTE_SESSION_NAME),
 			MODULE_ID_VOICE_MODULE_ST, st_enable);
 
 	return 0;
@@ -444,6 +522,8 @@ static int msm_voice_fens_put(struct snd_kcontrol *kcontrol,
 	pr_debug("%s: fens enable=%d\n", __func__, fens_enable);
 
 	voc_set_pp_enable(voc_get_session_id(VOICE_SESSION_NAME),
+			MODULE_ID_VOICE_MODULE_FENS, fens_enable);
+	voc_set_pp_enable(voc_get_session_id(SGLTE_SESSION_NAME),
 			MODULE_ID_VOICE_MODULE_FENS, fens_enable);
 
 	return 0;
@@ -481,6 +561,13 @@ static struct snd_kcontrol_new msm_voice_controls[] = {
 				msm_volte_mute_get, msm_volte_mute_put),
 	SOC_SINGLE_EXT("VoLTE Rx Volume", SND_SOC_NOPM, 0, 5, 0,
 				msm_volte_volume_get, msm_volte_volume_put),
+	SOC_SINGLE_EXT("SGLTE Rx Device Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_sglte_rx_device_mute_get,
+				msm_sglte_rx_device_mute_put),
+	SOC_SINGLE_EXT("SGLTE Tx Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_sglte_mute_get, msm_sglte_mute_put),
+	SOC_SINGLE_EXT("SGLTE Rx Volume", SND_SOC_NOPM, 0, 5, 0,
+				msm_sglte_volume_get, msm_sglte_volume_put),
 };
 
 static struct snd_pcm_ops msm_pcm_ops = {
@@ -543,6 +630,7 @@ static int __init msm_soc_platform_init(void)
 	memset(&voice_info, 0, sizeof(voice_info));
 	mutex_init(&voice_info[VOICE_SESSION_INDEX].lock);
 	mutex_init(&voice_info[VOLTE_SESSION_INDEX].lock);
+	mutex_init(&voice_info[SGLTE_SESSION_INDEX].lock);
 
 	return platform_driver_register(&msm_pcm_driver);
 }

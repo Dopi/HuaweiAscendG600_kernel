@@ -95,13 +95,12 @@ static struct pm8xxx_gpio_init pm8038_gpios[] __initdata = {
 	PM8XXX_GPIO_INPUT(11, PM_GPIO_PULL_UP_30),
 	/* haptics gpio */
 	PM8XXX_GPIO_OUTPUT_FUNC(7, 0, PM_GPIO_FUNC_1),
+	/* MHL PWR EN */
+	PM8XXX_GPIO_OUTPUT_VIN(5, 1, PM_GPIO_VIN_VPH),
 };
 
 /* Initial pm8038 MPP configurations */
-static struct pm8xxx_mpp_init pm8038_mpps[] __initdata = {
-	/* External 5V regulator enable; shared by HDMI and USB_OTG switches. */
-	PM8XXX_MPP_INIT(3, D_INPUT, PM8038_MPP_DIG_LEVEL_VPH, DIN_TO_INT),
-};
+static struct pm8xxx_mpp_init pm8038_mpps[] __initdata = {};
 
 void __init msm8930_pm8038_gpio_mpp_init(void)
 {
@@ -213,6 +212,7 @@ static struct pm8921_charger_platform_data pm8921_chg_pdata __devinitdata = {
 	.update_time		= 60000,
 	.max_voltage		= MAX_VOLTAGE_MV,
 	.min_voltage		= 3200,
+	.uvd_thresh_voltage	= 4050,
 	.resume_voltage_delta	= 100,
 	.term_current		= 100,
 	.cool_temp		= 10,
@@ -274,11 +274,16 @@ static int pm8038_led0_pwm_duty_pcts[56] = {
 		14, 10, 6, 4, 1
 };
 
+/*
+ * Note: There is a bug in LPG module that results in incorrect
+ * behavior of pattern when LUT index 0 is used. So effectively
+ * there are 63 usable LUT entries.
+ */
 static struct pm8xxx_pwm_duty_cycles pm8038_led0_pwm_duty_cycles = {
 	.duty_pcts = (int *)&pm8038_led0_pwm_duty_pcts,
 	.num_duty_pcts = ARRAY_SIZE(pm8038_led0_pwm_duty_pcts),
 	.duty_ms = PM8XXX_LED_PWM_DUTY_MS,
-	.start_idx = 0,
+	.start_idx = 1,
 };
 
 static struct pm8xxx_led_config pm8038_led_configs[] = {
@@ -323,6 +328,7 @@ static struct pm8xxx_led_platform_data pm8xxx_leds_pdata = {
 
 static struct pm8xxx_ccadc_platform_data pm8xxx_ccadc_pdata = {
 	.r_sense		= 10,
+	.calib_delay_ms		= 600000,
 };
 
 static struct pm8xxx_misc_platform_data pm8xxx_misc_pdata = {
@@ -338,7 +344,6 @@ static struct pm8921_bms_platform_data pm8921_bms_pdata __devinitdata = {
 	.r_sense		= 10,
 	.i_test			= 2500,
 	.v_failure		= 3000,
-	.calib_delay_ms		= 600000,
 	.max_voltage_uv		= MAX_VOLTAGE_MV * 1000,
 };
 

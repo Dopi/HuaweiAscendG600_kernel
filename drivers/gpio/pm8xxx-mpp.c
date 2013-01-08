@@ -15,6 +15,7 @@
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
+#include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
 #include <linux/seq_file.h>

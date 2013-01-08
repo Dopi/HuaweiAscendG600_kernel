@@ -272,7 +272,7 @@ static void usba_init_debugfs(struct usba_udc *udc)
 
 	regs_resource = platform_get_resource(udc->pdev, IORESOURCE_MEM,
 				CTRL_IOMEM_ID);
-	regs->d_inode->i_size = regs_resource->end - regs_resource->start + 1;
+	regs->d_inode->i_size = resource_size(regs_resource);
 	udc->debugfs_regs = regs;
 
 	usba_ep_init_debugfs(udc, to_usba_ep(udc->gadget.ep0));
@@ -332,12 +332,12 @@ static int vbus_is_present(struct usba_udc *udc)
 
 static void toggle_bias(int is_on)
 {
-	unsigned int uckr = at91_sys_read(AT91_CKGR_UCKR);
+	unsigned int uckr = at91_pmc_read(AT91_CKGR_UCKR);
 
 	if (is_on)
-		at91_sys_write(AT91_CKGR_UCKR, uckr | AT91_PMC_BIASEN);
+		at91_pmc_write(AT91_CKGR_UCKR, uckr | AT91_PMC_BIASEN);
 	else
-		at91_sys_write(AT91_CKGR_UCKR, uckr & ~(AT91_PMC_BIASEN));
+		at91_pmc_write(AT91_CKGR_UCKR, uckr & ~(AT91_PMC_BIASEN));
 }
 
 #else
@@ -527,7 +527,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
 
 	DBG(DBG_GADGET, "%s: ep_enable: desc=%p\n", ep->ep.name, desc);
 
-	maxpacket = le16_to_cpu(desc->wMaxPacketSize) & 0x7ff;
+	maxpacket = usb_endpoint_maxp(desc) & 0x7ff;
 
 	if (((desc->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK) != ep->index)
 			|| ep->index == 0
@@ -571,7 +571,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
 		 * Bits 11:12 specify number of _additional_
 		 * transactions per microframe.
 		 */
-		nr_trans = ((le16_to_cpu(desc->wMaxPacketSize) >> 11) & 3) + 1;
+		nr_trans = ((usb_endpoint_maxp(desc) >> 11) & 3) + 1;
 		if (nr_trans > 3)
 			return -EINVAL;
 
@@ -659,6 +659,7 @@ static int usba_ep_disable(struct usb_ep *_ep)
 		return -EINVAL;
 	}
 	ep->desc = NULL;
+	ep->ep.desc = NULL;
 
 	list_splice_init(&ep->queue, &req_list);
 	if (ep->can_dma) {
@@ -1038,7 +1039,7 @@ static struct usba_udc the_udc = {
 	.gadget	= {
 		.ops		= &usba_udc_ops,
 		.ep_list	= LIST_HEAD_INIT(the_udc.gadget.ep_list),
-		.is_dualspeed	= 1,
+		.max_speed	= USB_SPEED_HIGH,
 		.name		= "atmel_usba_udc",
 		.dev	= {
 			.init_name	= "gadget",
@@ -1718,13 +1719,12 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
 			spin_lock(&udc->lock);
 		}
 
-		if (status & USBA_HIGH_SPEED) {
-			DBG(DBG_BUS, "High-speed bus reset detected\n");
+		if (status & USBA_HIGH_SPEED)
 			udc->gadget.speed = USB_SPEED_HIGH;
-		} else {
-			DBG(DBG_BUS, "Full-speed bus reset detected\n");
+		else
 			udc->gadget.speed = USB_SPEED_FULL;
-		}
+		DBG(DBG_BUS, "%s bus reset detected\n",
+		    usb_speed_string(udc->gadget.speed));
 
 		ep0 = &usba_ep[0];
 		ep0->desc = &usba_ep0_desc;

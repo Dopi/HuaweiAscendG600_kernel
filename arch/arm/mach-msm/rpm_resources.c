@@ -867,15 +867,39 @@ void msm_rpmrs_show_resources(void)
 	spin_unlock_irqrestore(&msm_rpmrs_lock, flags);
 }
 
-struct msm_rpmrs_limits *msm_rpmrs_lowest_limits(
-	bool from_idle, enum msm_pm_sleep_mode sleep_mode, uint32_t latency_us,
-	uint32_t sleep_us)
+s32 msm_cpuidle_get_deep_idle_latency(void)
+{
+	int i;
+	struct msm_rpmrs_level *level = msm_rpmrs_levels, *best = level;
+
+	if (!level)
+		return 0;
+
+	for (i = 0; i < msm_rpmrs_level_count; i++, level++) {
+		if (!level->available)
+			continue;
+		if (level->sleep_mode != MSM_PM_SLEEP_MODE_POWER_COLLAPSE)
+			continue;
+		/* Pick the first power collapse mode by default */
+		if (best->sleep_mode != MSM_PM_SLEEP_MODE_POWER_COLLAPSE)
+			best = level;
+		/* Find the lowest latency for power collapse */
+		if (level->latency_us < best->latency_us)
+			best = level;
+	}
+	return best->latency_us - 1;
+}
+
+static void *msm_rpmrs_lowest_limits(bool from_idle,
+		enum msm_pm_sleep_mode sleep_mode, uint32_t latency_us,
+		uint32_t sleep_us, uint32_t *power)
 {
 	unsigned int cpu = smp_processor_id();
 	struct msm_rpmrs_level *best_level = NULL;
 	bool irqs_detectable = false;
 	bool gpio_detectable = false;
 	int i;
+	uint32_t pwr;
 
 	if (sleep_mode == MSM_PM_SLEEP_MODE_POWER_COLLAPSE) {
 		irqs_detectable = msm_mpm_irqs_detectable(from_idle);
@@ -884,7 +908,6 @@ struct msm_rpmrs_limits *msm_rpmrs_lowest_limits(
 
 	for (i = 0; i < msm_rpmrs_level_count; i++) {
 		struct msm_rpmrs_level *level = &msm_rpmrs_levels[i];
-		uint32_t power;
 
 		if (!level->available)
 			continue;
@@ -902,31 +925,38 @@ struct msm_rpmrs_limits *msm_rpmrs_lowest_limits(
 					irqs_detectable, gpio_detectable))
 			continue;
 
+		if (MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE == sleep_mode)
+			if (!cpu && msm_rpm_local_request_is_outstanding())
+					break;
+
+
 		if (sleep_us <= 1) {
-			power = level->energy_overhead;
+			pwr = level->energy_overhead;
 		} else if (sleep_us <= level->time_overhead_us) {
-			power = level->energy_overhead / sleep_us;
+			pwr = level->energy_overhead / sleep_us;
 		} else if ((sleep_us >> 10) > level->time_overhead_us) {
-			power = level->steady_state_power;
+			pwr = level->steady_state_power;
 		} else {
-			power = level->steady_state_power;
-			power -= (level->time_overhead_us *
+			pwr = level->steady_state_power;
+			pwr -= (level->time_overhead_us *
 					level->steady_state_power)/sleep_us;
-			power += level->energy_overhead / sleep_us;
+			pwr += level->energy_overhead / sleep_us;
 		}
 
 		if (!best_level ||
-				best_level->rs_limits.power[cpu] >= power) {
+				best_level->rs_limits.power[cpu] >= pwr) {
 			level->rs_limits.latency_us[cpu] = level->latency_us;
-			level->rs_limits.power[cpu] = power;
+			level->rs_limits.power[cpu] = pwr;
 			best_level = level;
+			if (power)
+				*power = pwr;
 		}
 	}
 
 	return best_level ? &best_level->rs_limits : NULL;
 }
 
-int msm_rpmrs_enter_sleep(uint32_t sclk_count, struct msm_rpmrs_limits *limits,
+static int msm_rpmrs_enter_sleep(uint32_t sclk_count, void *limits,
 		bool from_idle, bool notify_rpm)
 {
 	int rc = 0;
@@ -944,7 +974,7 @@ int msm_rpmrs_enter_sleep(uint32_t sclk_count, struct msm_rpmrs_limits *limits,
 	return rc;
 }
 
-void msm_rpmrs_exit_sleep(struct msm_rpmrs_limits *limits, bool from_idle,
+static void msm_rpmrs_exit_sleep(void *limits, bool from_idle,
 		bool notify_rpm, bool collapsed)
 {
 
@@ -1067,9 +1097,16 @@ init_exit:
 }
 device_initcall(msm_rpmrs_init);
 
+static struct msm_pm_sleep_ops msm_rpmrs_ops = {
+	.lowest_limits = msm_rpmrs_lowest_limits,
+	.enter_sleep = msm_rpmrs_enter_sleep,
+	.exit_sleep = msm_rpmrs_exit_sleep,
+};
+
 static int __init msm_rpmrs_l2_init(void)
 {
-	if (cpu_is_msm8960() || cpu_is_msm8930() || cpu_is_apq8064()) {
+	if (cpu_is_msm8960() || cpu_is_msm8930() || cpu_is_msm8930aa() ||
+	    cpu_is_apq8064() || cpu_is_msm8627()) {
 
 		msm_pm_set_l2_flush_flag(0);
 
@@ -1085,6 +1122,9 @@ static int __init msm_rpmrs_l2_init(void)
 		msm_rpmrs_l2_cache.aggregate = NULL;
 		msm_rpmrs_l2_cache.restore = NULL;
 	}
+
+	msm_pm_set_sleep_ops(&msm_rpmrs_ops);
+
 	return 0;
 }
 early_initcall(msm_rpmrs_l2_init);

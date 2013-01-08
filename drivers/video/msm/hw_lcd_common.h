@@ -93,14 +93,8 @@ struct lcd_state_type
 	boolean disp_powered_up;
 };
 
-#ifdef CONFIG_FB_DYNAMIC_GAMMA
-/* Check whether the panel supports dynamic gamma function */
-int is_panel_support_dynamic_gamma(void);
-#endif
-#ifdef CONFIG_FB_AUTO_CABC
-/* Check whether the panel supports auto cabc function */
-int is_panel_support_auto_cabc(void);
-#endif
+/* remove the declare functions is_panel_support_dynamic_gamma(void) */
+/* and is_panel_support_auto_cabc */
 
 void lcd_spi_init(struct msm_panel_common_pdata *lcdc_pnael_data);
 void truly_r61529_set_cs(struct msm_panel_common_pdata *lcdc_pnael_data);
@@ -117,5 +111,10 @@ void process_mipi_table(struct msm_fb_data_type *mfd,struct dsi_buf *tp,
 	               struct sequence *table, size_t count, lcd_panel_type lcd_panel);
 #endif
 int process_mddi_table(struct sequence *table, size_t count, lcd_panel_type lcd_panel);
+
+#if (LCD_HX8369A_TIANMA_ESD_SIGN || LCD_OTM8009A_CMI_ESD_SIGN)
+int process_mipi_read_table(struct msm_fb_data_type *mfd,struct dsi_buf *tp,
+					struct dsi_buf *rp,struct read_sequence *table);
+#endif
 
 #endif

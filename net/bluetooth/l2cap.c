@@ -52,16 +52,17 @@
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
 #include <net/bluetooth/l2cap.h>
+#include <linux/module.h>
 
 #define VERSION "2.14"
 
 #ifdef CONFIG_BT_L2CAP_EXT_FEATURES
-static int enable_ertm = 1;
+static bool enable_ertm = 1;
 #else
-static int enable_ertm = 0;
+static bool enable_ertm = 0;
 #endif
-static int max_transmit = L2CAP_DEFAULT_MAX_TX;
-static int tx_window = L2CAP_DEFAULT_TX_WINDOW;
+static uint max_transmit = L2CAP_DEFAULT_MAX_TX;
+static uint tx_window = L2CAP_DEFAULT_TX_WINDOW;
 
 static u32 l2cap_feat_mask = L2CAP_FEAT_FIXED_CHAN;
 static u8 l2cap_fixed_chan[8] = { 0x02, };

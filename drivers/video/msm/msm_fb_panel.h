@@ -82,6 +82,7 @@ struct lcdc_panel_info {
 	uint32 xres_pad;
 	/* Pad height */
 	uint32 yres_pad;
+	boolean is_sync_active_high;
 };
 
 struct mddi_panel_info {
@@ -192,6 +193,7 @@ struct msm_fb_panel_data {
 	/* function entry chain */
 	int (*on) (struct platform_device *pdev);
 	int (*off) (struct platform_device *pdev);
+	int (*power_ctrl) (boolean enable);
 #ifdef CONFIG_FB_DYNAMIC_GAMMA
 	int (*set_dynamic_gamma) (enum danymic_gamma_mode gamma_mode,struct msm_fb_data_type *mfd);
 #endif
@@ -201,7 +203,6 @@ struct msm_fb_panel_data {
 #ifdef CONFIG_HUAWEI_KERNEL
 	void (*set_cabc_brightness) (struct msm_fb_data_type *,uint32 level);
 #endif
-	int (*power_ctrl) (boolean enable);
 	struct platform_device *next;
 	int (*clk_func) (int enable);
 };

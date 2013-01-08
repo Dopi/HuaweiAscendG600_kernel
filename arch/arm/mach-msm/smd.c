@@ -40,10 +40,13 @@
 #include <mach/system.h>
 #include <mach/subsystem_notif.h>
 #include <mach/socinfo.h>
+#include <mach/proc_comm.h>
 #include <asm/cacheflush.h>
 
+#ifdef CONFIG_HUAWEI_KERNEL  
+#include <linux/sched.h> 
+#endif
 #include "smd_private.h"
-#include "proc_comm.h"
 #include "modem_notifier.h"
 
 #if defined(CONFIG_ARCH_QSD8X50) || defined(CONFIG_ARCH_MSM8X60) \
@@ -559,7 +562,11 @@ static void notify_other_smsm(uint32_t smsm_entry, uint32_t notify_mask)
 	 * on DEM-based targets.  Grabbing a wakelock in this case will
 	 * abort the power-down sequencing.
 	 */
-	smsm_cb_snapshot(0);
+	if (smsm_info.intr_mask &&
+	    (__raw_readl(SMSM_INTR_MASK_ADDR(smsm_entry, SMSM_APPS))
+				& notify_mask)) {
+		smsm_cb_snapshot(0);
+	}
 }
 
 void smd_diag(void)
@@ -2129,7 +2136,7 @@ void smd_enable_read_intr(smd_channel_t *ch)
     #else
 	if (ch)
 	{
-		ch->half_ch->set_fBLOCKREADINTR(ch->send, 0);
+		ch->half_ch->set_fBLOCKREADINTR(ch->send, 0); 
 		printk("%s:channel name:%s \n", __func__,ch->name); 
 	}
     #endif

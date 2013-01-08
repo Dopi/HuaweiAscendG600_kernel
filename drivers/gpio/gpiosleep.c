@@ -18,7 +18,7 @@
 #include <linux/param.h>
 #include <linux/bitops.h>
 #include <linux/termios.h>
-#include <mach/gpio.h>
+#include <linux/gpio.h>
 #include <mach/msm_serial_hs.h>
 #include <linux/mtk6252_dev.h>
 

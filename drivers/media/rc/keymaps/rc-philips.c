@@ -10,6 +10,7 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/module.h>
 #include <media/rc-map.h>
 
 static struct rc_map_table philips[] = {

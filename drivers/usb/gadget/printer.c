@@ -8,15 +8,6 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include <linux/module.h>
@@ -43,7 +34,6 @@
 #include <asm/byteorder.h>
 #include <linux/io.h>
 #include <linux/irq.h>
-#include <asm/system.h>
 #include <linux/uaccess.h>
 #include <asm/unaligned.h>
 
@@ -794,12 +784,14 @@ printer_write(struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 }
 
 static int
-printer_fsync(struct file *fd, int datasync)
+printer_fsync(struct file *fd, loff_t start, loff_t end, int datasync)
 {
 	struct printer_dev	*dev = fd->private_data;
+	struct inode *inode = fd->f_path.dentry->d_inode;
 	unsigned long		flags;
 	int			tx_list_empty;
 
+	mutex_lock(&inode->i_mutex);
 	spin_lock_irqsave(&dev->lock, flags);
 	tx_list_empty = (likely(list_empty(&dev->tx_reqs)));
 	spin_unlock_irqrestore(&dev->lock, flags);
@@ -809,6 +801,7 @@ printer_fsync(struct file *fd, int datasync)
 		wait_event_interruptible(dev->tx_flush_wait,
 				(likely(list_empty(&dev->tx_reqs_active))));
 	}
+	mutex_unlock(&inode->i_mutex);
 
 	return 0;
 }
@@ -968,23 +961,15 @@ printer_set_config(struct printer_dev *dev, unsigned number)
 		usb_gadget_vbus_draw(dev->gadget,
 				dev->gadget->is_otg ? 8 : 100);
 	} else {
-		char *speed;
 		unsigned power;
 
 		power = 2 * config_desc.bMaxPower;
 		usb_gadget_vbus_draw(dev->gadget, power);
 
-		switch (gadget->speed) {
-		case USB_SPEED_FULL:	speed = "full"; break;
-#ifdef CONFIG_USB_GADGET_DUALSPEED
-		case USB_SPEED_HIGH:	speed = "high"; break;
-#endif
-		default:		speed = "?"; break;
-		}
-
 		dev->config = number;
-		INFO(dev, "%s speed config #%d: %d mA, %s\n",
-				speed, number, power, driver_desc);
+		INFO(dev, "%s config #%d: %d mA, %s\n",
+		     usb_speed_string(gadget->speed),
+		     number, power, driver_desc);
 	}
 	return result;
 }
@@ -1155,7 +1140,7 @@ printer_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 				break;
 #ifdef CONFIG_USB_GADGET_DUALSPEED
 			case USB_DT_DEVICE_QUALIFIER:
-				if (!gadget->is_dualspeed)
+				if (!gadget_is_dualspeed(gadget))
 					break;
 				/*
 				 * assumes ep0 uses the same value for both
@@ -1169,7 +1154,7 @@ printer_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 				break;
 
 			case USB_DT_OTHER_SPEED_CONFIG:
-				if (!gadget->is_dualspeed)
+				if (!gadget_is_dualspeed(gadget))
 					break;
 				/* FALLTHROUGH */
 #endif /* CONFIG_USB_GADGET_DUALSPEED */
@@ -1549,7 +1534,7 @@ fail:
 /*-------------------------------------------------------------------------*/
 
 static struct usb_gadget_driver printer_driver = {
-	.speed		= DEVSPEED,
+	.max_speed	= DEVSPEED,
 
 	.function	= (char *) driver_desc,
 	.unbind		= printer_unbind,

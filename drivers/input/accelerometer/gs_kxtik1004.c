@@ -42,6 +42,12 @@
 #define GS_DEBUG(fmt, args...)
 #endif
 /*DBG */
+/*This is the classcial Delay_time from framework and the units is ms*/
+#define DELAY_FASTEST  10
+#define DELAY_GAME     20
+#define DELAY_UI       68
+#define DELAY_NORMAL  200
+#define DELAY_ERROR 10000
 /*
  * The following table lists the maximum appropriate poll interval for each
  * available output data rate.
@@ -50,10 +56,11 @@ static const struct {
 	unsigned int cutoff;
 	u8 mask;
 } kxtik_odr_table[] = {
-	{ 20,ODR100F },
-	{ 40,ODR50F  },
-	{ 80,ODR25F  },
-	{ 0, ODR12_5F},
+	{ DELAY_FASTEST,ODR200F},
+	{ DELAY_GAME,   ODR100F},
+	{ DELAY_UI,      ODR25F},
+	{ DELAY_NORMAL,ODR12_5F},
+	{ DELAY_ERROR, ODR12_5F},
 };
 static int kxtik_debug_mask ;
 module_param_named(kxtik_debug, kxtik_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
@@ -133,15 +140,19 @@ static int gs_data_to_compass(signed short accel_data [3])
 static void gs_kxtik_update_odr(struct gs_data  *gs)
 {
 	int i;
-	int reg;
-	int ret;
+	int reg = 0;
+	int ret = 0;
 	short time_reg;
 	for (i = 0; i < ARRAY_SIZE(kxtik_odr_table); i++) 
 	{
 		time_reg = kxtik_odr_table[i].mask;
-		if (accel_delay < kxtik_odr_table[i].cutoff)
+		if (accel_delay <= kxtik_odr_table[i].cutoff)
+		{
+			accel_delay = kxtik_odr_table[i].cutoff;
 			break;
+		}
 	}
+	/*kxtik doesn't need to use mask,this register's fuction is independence*/
 	reg  = reg_read(gs, CTRL_REG1);
 	ret  = reg_write(gs, CTRL_REG1,0x00);
 	ret |= reg_write(gs,DATA_CTRL,time_reg);

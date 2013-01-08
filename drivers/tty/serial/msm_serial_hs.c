@@ -47,6 +47,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/dma-mapping.h>
 #include <linux/dmapool.h>
+#include <linux/tty_flip.h>
 #include <linux/wait.h>
 #include <linux/sysfs.h>
 #include <linux/stat.h>
@@ -55,7 +56,6 @@
 #include <linux/debugfs.h>
 #include <asm/atomic.h>
 #include <asm/irq.h>
-#include <asm/system.h>
 
 #include <mach/hardware.h>
 #include <mach/dma.h>
@@ -95,6 +95,8 @@ enum msm_hs_clk_req_off_state_e {
 struct msm_hs_tx {
 	unsigned int tx_ready_int_en;  /* ok to dma more tx */
 	unsigned int dma_in_flight;    /* tx dma in progress */
+	enum flush_reason flush;
+	wait_queue_head_t wait;
 	struct msm_dmov_cmd xfer;
 	dmov_box *command_ptr;
 	u32 *command_ptr_ptr;
@@ -895,7 +897,7 @@ static void msm_hs_submit_tx_locked(struct uart_port *uport)
 
 	dma_sync_single_for_device(uport->dev, tx->mapped_cmd_ptr_ptr,
 				   sizeof(u32), DMA_TO_DEVICE);
-
+	msm_uport->tx.flush = FLUSH_NONE;
 	msm_dmov_enqueue_cmd(msm_uport->dma_tx_channel, &tx->xfer);
 }
 
@@ -1091,14 +1093,10 @@ out:
 }
 
 /* Enable the transmitter Interrupt */
-/*back to Qcomm original 1025 base line*/
 static void msm_hs_start_tx_locked(struct uart_port *uport )
 {
 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
 
-
-/*back to Qcomm original 1025 base line*/
-	
 	if (msm_uport->tx.tx_ready_int_en == 0) {
 		msm_uport->tx.tx_ready_int_en = 1;
 		if (msm_uport->tx.dma_in_flight == 0)
@@ -1119,9 +1117,13 @@ static void msm_hs_dmov_tx_callback(struct msm_dmov_cmd *cmd_ptr,
 {
 	struct msm_hs_port *msm_uport;
 
-	WARN_ON(result != 0x80000002);  /* DMA did not finish properly */
-
 	msm_uport = container_of(cmd_ptr, struct msm_hs_port, tx.xfer);
+	if (msm_uport->tx.flush == FLUSH_STOP)
+		/* DMA FLUSH unsuccesfful */
+		WARN_ON(!(result & DMOV_RSLT_FLUSH));
+	else
+		/* DMA did not finish properly */
+		WARN_ON(!(result & DMOV_RSLT_DONE));
 
 	tasklet_schedule(&msm_uport->tx.tlet);
 }
@@ -1133,6 +1135,12 @@ static void msm_serial_hs_tx_tlet(unsigned long tlet_ptr)
 				tlet_ptr, struct msm_hs_port, tx.tlet);
 
 	spin_lock_irqsave(&(msm_uport->uport.lock), flags);
+	if (msm_uport->tx.flush == FLUSH_STOP) {
+		msm_uport->tx.flush = FLUSH_SHUTDOWN;
+		wake_up(&msm_uport->tx.wait);
+		spin_unlock_irqrestore(&(msm_uport->uport.lock), flags);
+		return;
+	}
 
 	msm_uport->imr_reg |= UARTDM_ISR_TX_READY_BMSK;
 	msm_hs_write(&(msm_uport->uport), UARTDM_IMR_ADDR, msm_uport->imr_reg);
@@ -1562,7 +1570,6 @@ void msm_hs_request_clock_on(struct uart_port *uport)
 }
 EXPORT_SYMBOL(msm_hs_request_clock_on);
 
-/*back to Qcomm original 1025 base line*/
 static irqreturn_t msm_hs_wakeup_isr(int irq, void *dev)
 {
 	unsigned int wakeup = 0;
@@ -1601,14 +1608,11 @@ static irqreturn_t msm_hs_wakeup_isr(int irq, void *dev)
 		tty_flip_buffer_push(tty);
 	return IRQ_HANDLED;
 }
-/*back to Qcomm original 1025 base line*/
 
 static const char *msm_hs_type(struct uart_port *port)
 {
 	return ("MSM HS UART");
 }
-
-/*back to Qcomm original 1025 base line*/
 
 /* Called when port is opened */
 static int msm_hs_startup(struct uart_port *uport)
@@ -1621,7 +1625,6 @@ static int msm_hs_startup(struct uart_port *uport)
 	struct circ_buf *tx_buf = &uport->state->xmit;
 	struct msm_hs_tx *tx = &msm_uport->tx;
 
-/*back to Qcomm original 1025 base line*/
 	rfr_level = uport->fifosize;
 	if (rfr_level > 16)
 		rfr_level -= 16;
@@ -1715,6 +1718,7 @@ static int msm_hs_startup(struct uart_port *uport)
 		goto free_wake_irq;
 	}
 	if (use_low_power_wakeup(msm_uport)) {
+
 		ret = request_threaded_irq(msm_uport->wakeup.irq, NULL,
 					msm_hs_wakeup_isr,
 					IRQF_TRIGGER_FALLING,
@@ -1779,6 +1783,7 @@ static int uartdm_init_port(struct uart_port *uport)
 	tx->xfer.cmdptr = DMOV_CMD_ADDR(tx->mapped_cmd_ptr_ptr);
 
 	init_waitqueue_head(&rx->wait);
+	init_waitqueue_head(&tx->wait);
 	wake_lock_init(&rx->wake_lock, WAKE_LOCK_SUSPEND, "msm_serial_hs_rx");
 	wake_lock_init(&msm_uport->dma_wake_lock, WAKE_LOCK_SUSPEND,
 		       "msm_serial_hs_dma");
@@ -1973,7 +1978,6 @@ static int __devinit msm_hs_probe(struct platform_device *pdev)
 	INIT_WORK(&msm_uport->clock_off_w, hsuart_clock_off_work);
 	mutex_init(&msm_uport->clk_mutex);
 
-	/* QualComm baseLine update 1030 to 1040 begin */
 	clk_prepare_enable(msm_uport->clk);
 	if (msm_uport->pclk)
 		clk_prepare_enable(msm_uport->pclk);
@@ -1992,7 +1996,6 @@ static int __devinit msm_hs_probe(struct platform_device *pdev)
 	clk_disable_unprepare(msm_uport->clk);
 	if (msm_uport->pclk)
 		clk_disable_unprepare(msm_uport->pclk);
-	/* QualComm baseLine update 1030 to 1040 end */
 
 	/*
 	 * Enable Command register protection before going ahead as this hw
@@ -2052,26 +2055,43 @@ static int __init msm_serial_hs_init(void)
  *     - Disables the port
  *     - Unhook the ISR
  */
-/*back to Qcomm original 1025 base line*/
-
 static void msm_hs_shutdown(struct uart_port *uport)
 {
+	int ret;
+	unsigned int data;
+	unsigned long flags;
 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
 
-	
-/*back to Qcomm original 1025 base line*/
-	
-	BUG_ON(msm_uport->rx.flush < FLUSH_STOP);
+	if (msm_uport->tx.dma_in_flight) {
+		spin_lock_irqsave(&uport->lock, flags);
+		/* disable UART TX interface to DM */
+		data = msm_hs_read(uport, UARTDM_DMEN_ADDR);
+		data &= ~UARTDM_TX_DM_EN_BMSK;
+		msm_hs_write(uport, UARTDM_DMEN_ADDR, data);
+		/* turn OFF UART Transmitter */
+		msm_hs_write(uport, UARTDM_CR_ADDR, UARTDM_CR_TX_DISABLE_BMSK);
+		/* reset UART TX */
+		msm_hs_write(uport, UARTDM_CR_ADDR, RESET_TX);
+		/* reset UART TX Error */
+		msm_hs_write(uport, UARTDM_CR_ADDR, RESET_TX_ERROR);
+		msm_uport->tx.flush = FLUSH_STOP;
+		spin_unlock_irqrestore(&uport->lock, flags);
+		/* discard flush */
+		msm_dmov_flush(msm_uport->dma_tx_channel, 0);
+		ret = wait_event_timeout(msm_uport->tx.wait,
+			msm_uport->tx.flush == FLUSH_SHUTDOWN, 100);
+		if (!ret)
+			pr_err("%s():HSUART TX Stalls.\n", __func__);
+	}
 	tasklet_kill(&msm_uport->tx.tlet);
+	BUG_ON(msm_uport->rx.flush < FLUSH_STOP);
 	wait_event(msm_uport->rx.wait, msm_uport->rx.flush == FLUSH_SHUTDOWN);
 	tasklet_kill(&msm_uport->rx.tlet);
 	cancel_delayed_work_sync(&msm_uport->rx.flip_insert_work);
-
 	flush_workqueue(msm_uport->hsuart_wq);
 	pm_runtime_disable(uport->dev);
 	pm_runtime_set_suspended(uport->dev);
 
-	mutex_lock(&msm_uport->clk_mutex);
 	/* Disable the transmitter */
 	msm_hs_write(uport, UARTDM_CR_ADDR, UARTDM_CR_TX_DISABLE_BMSK);
 	/* Disable the receiver */
@@ -2084,7 +2104,6 @@ static void msm_hs_shutdown(struct uart_port *uport)
 	 * Hence mb() requires here.
 	 */
 	mb();
-
 	if (msm_uport->clk_state != MSM_HS_CLK_OFF) {
 		/* to balance clk_state */
 		clk_disable_unprepare(msm_uport->clk);
@@ -2092,8 +2111,8 @@ static void msm_hs_shutdown(struct uart_port *uport)
 			clk_disable_unprepare(msm_uport->pclk);
 		wake_unlock(&msm_uport->dma_wake_lock);
 	}
-	msm_uport->clk_state = MSM_HS_CLK_PORT_OFF;
 
+	msm_uport->clk_state = MSM_HS_CLK_PORT_OFF;
 	dma_unmap_single(uport->dev, msm_uport->tx.dma_base,
 			 UART_XMIT_SIZE, DMA_TO_DEVICE);
 
@@ -2104,7 +2123,6 @@ static void msm_hs_shutdown(struct uart_port *uport)
 	free_irq(uport->irq, msm_uport);
 	if (use_low_power_wakeup(msm_uport))
 		free_irq(msm_uport->wakeup.irq, msm_uport);
-	mutex_unlock(&msm_uport->clk_mutex);
 	mutex_destroy(&msm_uport->clk_mutex);
 }
 
@@ -2116,6 +2134,7 @@ static void __exit msm_serial_hs_exit(void)
 	uart_unregister_driver(&msm_hs_driver);
 }
 
+#if 0
 #if (defined(HUAWEI_BT_BLUEZ_VER30) || (!defined(CONFIG_HUAWEI_KERNEL)))
 static int msm_hs_runtime_idle(struct device *dev)
 {
@@ -2151,14 +2170,17 @@ static const struct dev_pm_ops msm_hs_dev_pm_ops = {
 };
 
 #endif
+#endif
 static struct platform_driver msm_serial_hs_platform_driver = {
 	.probe	= msm_hs_probe,
 	.remove = __devexit_p(msm_hs_remove),
 	.driver = {
 		.name = "msm_serial_hs",
-/*deactive pm if use bcm chip*/
+/*deactive pm */
+#if 0
 #if (defined(HUAWEI_BT_BLUEZ_VER30) || (!defined(CONFIG_HUAWEI_KERNEL)))
 		.pm   = &msm_hs_dev_pm_ops,
+#endif
 #endif
 	},
 };

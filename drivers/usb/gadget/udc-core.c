@@ -22,6 +22,7 @@
 #include <linux/device.h>
 #include <linux/list.h>
 #include <linux/err.h>
+#include <linux/dma-mapping.h>
 
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
@@ -44,9 +45,59 @@ struct usb_udc {
 };
 
 static struct class *udc_class;
-static struct device_type udc_device_type;
 static LIST_HEAD(udc_list);
 static DEFINE_MUTEX(udc_lock);
+
+/* ------------------------------------------------------------------------- */
+
+int usb_gadget_map_request(struct usb_gadget *gadget,
+		struct usb_request *req, int is_in)
+{
+	if (req->length == 0)
+		return 0;
+
+	if (req->num_sgs) {
+		int     mapped;
+
+		mapped = dma_map_sg(&gadget->dev, req->sg, req->num_sgs,
+				is_in ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
+		if (mapped == 0) {
+			dev_err(&gadget->dev, "failed to map SGs\n");
+			return -EFAULT;
+		}
+
+		req->num_mapped_sgs = mapped;
+	} else {
+		req->dma = dma_map_single(&gadget->dev, req->buf, req->length,
+				is_in ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
+
+		if (dma_mapping_error(&gadget->dev, req->dma)) {
+			dev_err(&gadget->dev, "failed to map buffer\n");
+			return -EFAULT;
+		}
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(usb_gadget_map_request);
+
+void usb_gadget_unmap_request(struct usb_gadget *gadget,
+		struct usb_request *req, int is_in)
+{
+	if (req->length == 0)
+		return;
+
+	if (req->num_mapped_sgs) {
+		dma_unmap_sg(&gadget->dev, req->sg, req->num_mapped_sgs,
+				is_in ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
+
+		req->num_mapped_sgs = 0;
+	} else {
+		dma_unmap_single(&gadget->dev, req->dma, req->length,
+				is_in ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
+	}
+}
+EXPORT_SYMBOL_GPL(usb_gadget_unmap_request);
 
 /* ------------------------------------------------------------------------- */
 
@@ -144,6 +195,7 @@ static void usb_udc_release(struct device *dev)
 	kfree(udc);
 }
 
+static const struct attribute_group *usb_udc_attr_groups[];
 /**
  * usb_add_gadget_udc - adds a new gadget to the udc class driver list
  * @parent: the parent device to this udc. Usually the controller
@@ -164,6 +216,7 @@ int usb_add_gadget_udc(struct device *parent, struct usb_gadget *gadget)
 	device_initialize(&udc->dev);
 	udc->dev.release = usb_udc_release;
 	udc->dev.class = udc_class;
+	udc->dev.groups = usb_udc_attr_groups;
 	udc->dev.parent = parent;
 	ret = dev_set_name(&udc->dev, "%s", kobject_name(&parent->kobj));
 	if (ret)
@@ -210,9 +263,9 @@ static void usb_gadget_remove_driver(struct usb_udc *udc)
 
 	if (udc_is_newstyle(udc)) {
 		udc->driver->disconnect(udc->gadget);
+		usb_gadget_disconnect(udc->gadget);
 		udc->driver->unbind(udc->gadget);
 		usb_gadget_udc_stop(udc->gadget, udc->driver);
-		usb_gadget_disconnect(udc->gadget);
 	} else {
 		usb_gadget_stop(udc->gadget, udc->driver);
 	}
@@ -269,8 +322,9 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
 
 	mutex_lock(&udc_lock);
 	list_for_each_entry(udc, &udc_list, list) {
-		/* For now we take the first one */
-		if (!udc->driver)
+		/* Match according to usb_core_id */
+		if (!udc->driver && udc->gadget &&
+		    udc->gadget->usb_core_id == driver->usb_core_id)
 			goto found;
 	}
 
@@ -343,7 +397,7 @@ EXPORT_SYMBOL_GPL(usb_gadget_unregister_driver);
 static ssize_t usb_udc_srp_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t n)
 {
-	struct usb_udc		*udc = dev_get_drvdata(dev);
+	struct usb_udc		*udc = container_of(dev, struct usb_udc, dev);
 
 	if (sysfs_streq(buf, "1"))
 		usb_gadget_wakeup(udc->gadget);
@@ -355,12 +409,16 @@ static DEVICE_ATTR(srp, S_IWUSR, NULL, usb_udc_srp_store);
 static ssize_t usb_udc_softconn_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t n)
 {
-	struct usb_udc		*udc = dev_get_drvdata(dev);
+	struct usb_udc		*udc = container_of(dev, struct usb_udc, dev);
 
 	if (sysfs_streq(buf, "connect")) {
+		if (udc_is_newstyle(udc))
+			usb_gadget_udc_start(udc->gadget, udc->driver);
 		usb_gadget_connect(udc->gadget);
 	} else if (sysfs_streq(buf, "disconnect")) {
 		usb_gadget_disconnect(udc->gadget);
+		if (udc_is_newstyle(udc))
+			usb_gadget_udc_stop(udc->gadget, udc->driver);
 	} else {
 		dev_err(dev, "unsupported command '%s'\n", buf);
 		return -EINVAL;
@@ -370,42 +428,40 @@ static ssize_t usb_udc_softconn_store(struct device *dev,
 }
 static DEVICE_ATTR(soft_connect, S_IWUSR, NULL, usb_udc_softconn_store);
 
-static ssize_t usb_udc_speed_show(struct device *dev,
+#define USB_UDC_SPEED_ATTR(name, param)					\
+ssize_t usb_udc_##param##_show(struct device *dev,			\
+		struct device_attribute *attr, char *buf)		\
+{									\
+	struct usb_udc *udc = container_of(dev, struct usb_udc, dev);	\
+	return snprintf(buf, PAGE_SIZE, "%s\n",				\
+			usb_speed_string(udc->gadget->param));		\
+}									\
+static DEVICE_ATTR(name, S_IRUSR, usb_udc_##param##_show, NULL)
+
+static USB_UDC_SPEED_ATTR(current_speed, speed);
+static USB_UDC_SPEED_ATTR(maximum_speed, max_speed);
+
+/* TODO: Scheduled for removal in 3.8. */
+static ssize_t usb_udc_is_dualspeed_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	struct usb_udc		*udc = dev_get_drvdata(dev);
-	struct usb_gadget	*gadget = udc->gadget;
-
-	switch (gadget->speed) {
-	case USB_SPEED_LOW:
-		return snprintf(buf, PAGE_SIZE, "low-speed\n");
-	case USB_SPEED_FULL:
-		return snprintf(buf, PAGE_SIZE, "full-speed\n");
-	case USB_SPEED_HIGH:
-		return snprintf(buf, PAGE_SIZE, "high-speed\n");
-	case USB_SPEED_WIRELESS:
-		return snprintf(buf, PAGE_SIZE, "wireless\n");
-	case USB_SPEED_SUPER:
-		return snprintf(buf, PAGE_SIZE, "super-speed\n");
-	case USB_SPEED_UNKNOWN:	/* FALLTHROUGH */
-	default:
-		return snprintf(buf, PAGE_SIZE, "UNKNOWN\n");
-	}
+	struct usb_udc		*udc = container_of(dev, struct usb_udc, dev);
+	return snprintf(buf, PAGE_SIZE, "%d\n",
+			gadget_is_dualspeed(udc->gadget));
 }
-static DEVICE_ATTR(speed, S_IRUSR, usb_udc_speed_show, NULL);
+static DEVICE_ATTR(is_dualspeed, S_IRUSR, usb_udc_is_dualspeed_show, NULL);
 
 #define USB_UDC_ATTR(name)					\
 ssize_t usb_udc_##name##_show(struct device *dev,		\
 		struct device_attribute *attr, char *buf)	\
 {								\
-	struct usb_udc		*udc = dev_get_drvdata(dev);	\
+	struct usb_udc		*udc = container_of(dev, struct usb_udc, dev); \
 	struct usb_gadget	*gadget = udc->gadget;		\
 								\
 	return snprintf(buf, PAGE_SIZE, "%d\n", gadget->name);	\
 }								\
-static DEVICE_ATTR(name, S_IRUSR, usb_udc_##name##_show, NULL)
+static DEVICE_ATTR(name, S_IRUGO, usb_udc_##name##_show, NULL)
 
-static USB_UDC_ATTR(is_dualspeed);
 static USB_UDC_ATTR(is_otg);
 static USB_UDC_ATTR(is_a_peripheral);
 static USB_UDC_ATTR(b_hnp_enable);
@@ -415,7 +471,8 @@ static USB_UDC_ATTR(a_alt_hnp_support);
 static struct attribute *usb_udc_attrs[] = {
 	&dev_attr_srp.attr,
 	&dev_attr_soft_connect.attr,
-	&dev_attr_speed.attr,
+	&dev_attr_current_speed.attr,
+	&dev_attr_maximum_speed.attr,
 
 	&dev_attr_is_dualspeed.attr,
 	&dev_attr_is_otg.attr,
@@ -468,8 +525,6 @@ static int __init usb_udc_init(void)
 	}
 
 	udc_class->dev_uevent = usb_udc_uevent;
-	udc_device_type.groups = usb_udc_attr_groups;
-
 	return 0;
 }
 subsys_initcall(usb_udc_init);

@@ -10,10 +10,13 @@
  * GNU General Public License for more details.
  *
  */
+
+#include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/mutex.h>
 #include <linux/wait.h>
 #include <linux/dma-mapping.h>
+#include <linux/sched.h>
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/msm_audio.h>

@@ -10,17 +10,18 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/clk.h>
 #include <linux/io.h>
-#include <linux/pm_qos_params.h>
+#include <linux/pm_qos.h>
 #include <mach/board.h>
 #include <mach/camera.h>
 #include <mach/camera.h>
 #include <mach/clk.h>
 #include <mach/msm_bus.h>
 #include <mach/msm_bus_board.h>
-
+#include <mach/dal_axi.h>
 
 #define MSM_AXI_QOS_PREVIEW 200000
 #define MSM_AXI_QOS_SNAPSHOT 200000
@@ -138,20 +139,20 @@ void msm_camio_set_perf_lvl(enum msm_bus_perf_setting perf_setting)
 	switch (perf_setting) {
 	case S_INIT:
 		add_axi_qos();
+		update_axi_qos(MSM_AXI_QOS_PREVIEW);
+		axi_allocate(AXI_FLOW_VIEWFINDER_HI);
 		break;
 	case S_PREVIEW:
-		update_axi_qos(MSM_AXI_QOS_PREVIEW);
+		// do nothing as axi clock/bandwidth is already set while INIT
 		break;
 	case S_VIDEO:
-		update_axi_qos(MSM_AXI_QOS_RECORDING);
 		break;
 	case S_CAPTURE:
-		update_axi_qos(MSM_AXI_QOS_SNAPSHOT);
 		break;
 	case S_DEFAULT:
-		update_axi_qos(PM_QOS_DEFAULT_VALUE);
 		break;
 	case S_EXIT:
+		axi_free(AXI_FLOW_VIEWFINDER_HI);
 		release_axi_qos();
 		break;
 	default:

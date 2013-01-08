@@ -79,10 +79,7 @@ struct smsm_interrupt_info {
   uint32_t aArm_wakeup_reason;
 };
 #elif !defined(CONFIG_MSM_SMD)
-void *smem_alloc(unsigned id, unsigned size)
-{
-	return NULL;
-}
+/* Don't trigger the error */
 #else
 #error No SMD Package Specified; aborting
 #endif

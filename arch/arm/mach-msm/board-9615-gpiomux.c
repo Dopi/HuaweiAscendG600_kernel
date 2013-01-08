@@ -12,9 +12,9 @@
  */
 
 #include <linux/init.h>
+#include <linux/gpio.h>
 #include <mach/gpiomux.h>
 #include <mach/board.h>
-#include <mach/gpio.h>
 #include "board-9615.h"
 
 static struct gpiomux_setting ps_hold = {

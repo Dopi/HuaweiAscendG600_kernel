@@ -13,6 +13,7 @@
 
 #include <linux/init.h>
 #include <linux/ioport.h>
+#include <linux/gpio.h>
 #include <linux/platform_device.h>
 #include <linux/bootmem.h>
 #include <linux/mfd/pm8xxx/pm8921.h>
@@ -23,7 +24,6 @@
 #include <asm/mach/mmc.h>
 #include <mach/msm_bus_board.h>
 #include <mach/board.h>
-#include <mach/gpio.h>
 #include <mach/gpiomux.h>
 #include <mach/restart.h>
 #include "devices.h"
@@ -126,7 +126,6 @@ static struct pm8xxx_gpio_init pm8921_gpios[] __initdata = {
 	PM8921_GPIO_INPUT(38, PM_GPIO_PULL_UP_30),
 	/* TABLA CODEC RESET */
 	PM8921_GPIO_OUTPUT(34, 1, MED),
-	PM8921_GPIO_INPUT(31, PM_GPIO_PULL_NO),
 	PM8921_GPIO_OUTPUT(13, 0, HIGH),               /* PCIE_CLK_PWR_EN */
 };
 
@@ -237,11 +236,16 @@ static int pm8921_led0_pwm_duty_pcts[56] = {
 	14, 10, 6, 4, 1
 };
 
+/*
+ * Note: There is a bug in LPG module that results in incorrect
+ * behavior of pattern when LUT index 0 is used. So effectively
+ * there are 63 usable LUT entries.
+ */
 static struct pm8xxx_pwm_duty_cycles pm8921_led0_pwm_duty_cycles = {
 	.duty_pcts = (int *)&pm8921_led0_pwm_duty_pcts,
 	.num_duty_pcts = ARRAY_SIZE(pm8921_led0_pwm_duty_pcts),
 	.duty_ms = PM8XXX_LED_PWM_DUTY_MS,
-	.start_idx = 0,
+	.start_idx = 1,
 };
 
 static struct pm8xxx_led_config pm8921_led_configs[] = {
@@ -343,6 +347,7 @@ apq8064_pm8921_chg_pdata __devinitdata = {
 	.update_time		= 60000,
 	.max_voltage		= MAX_VOLTAGE_MV,
 	.min_voltage		= 3200,
+	.uvd_thresh_voltage	= 4050,
 	.resume_voltage_delta	= 100,
 	.term_current		= 100,
 	.cool_temp		= 10,
@@ -360,6 +365,7 @@ apq8064_pm8921_chg_pdata __devinitdata = {
 static struct pm8xxx_ccadc_platform_data
 apq8064_pm8xxx_ccadc_pdata = {
 	.r_sense		= 10,
+	.calib_delay_ms		= 600000,
 };
 
 static struct pm8921_bms_platform_data
@@ -368,7 +374,6 @@ apq8064_pm8921_bms_pdata __devinitdata = {
 	.r_sense		= 10,
 	.i_test			= 2500,
 	.v_failure		= 3000,
-	.calib_delay_ms		= 600000,
 	.max_voltage_uv		= MAX_VOLTAGE_MV * 1000,
 };
 

@@ -17,6 +17,7 @@
 #include <linux/msm_rotator.h>
 #include <linux/clkdev.h>
 #include <linux/dma-mapping.h>
+#include <linux/coresight.h>
 #include <mach/irqs-8064.h>
 #include <mach/board.h>
 #include <mach/msm_iomap.h>
@@ -32,7 +33,6 @@
 #include <mach/msm_smd.h>
 #include <mach/msm_dcvs.h>
 #include <mach/msm_rtb.h>
-#include <mach/qdss.h>
 #include <linux/ion.h>
 #include "clock.h"
 #include "devices.h"
@@ -94,14 +94,6 @@
 /* Address of PCIE20 */
 #define PCIE20_PHYS   0x1b500000
 #define PCIE20_SIZE   SZ_4K
-
-/* AXI address for PCIE device BAR resources */
-#define PCIE_AXI_BAR_PHYS   0x08000000
-#define PCIE_AXI_BAR_SIZE   SZ_8M
-
-/* AXI address for PCIE device config space */
-#define PCIE_AXI_CONF_PHYS   0x08c00000
-#define PCIE_AXI_CONF_SIZE   SZ_4K
 
 static struct msm_watchdog_pdata msm_watchdog_pdata = {
 	.pet_time = 10000,
@@ -860,6 +852,27 @@ struct platform_device apq8064_device_ehci_host4 = {
 	},
 };
 
+struct platform_device apq8064_device_acpuclk = {
+	.name		= "acpuclk-8064",
+	.id		= -1,
+};
+
+#define SHARED_IMEM_TZ_BASE 0x2a03f720
+static struct resource tzlog_resources[] = {
+	{
+		.start = SHARED_IMEM_TZ_BASE,
+		.end = SHARED_IMEM_TZ_BASE + SZ_4K - 1,
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+struct platform_device apq_device_tz_log = {
+	.name		= "tz_log",
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(tzlog_resources),
+	.resource	= tzlog_resources,
+};
+
 /* MSM Video core device */
 #ifdef CONFIG_MSM_BUS_SCALING
 static struct msm_bus_vectors vidc_init_vectors[] = {
@@ -1045,6 +1058,59 @@ static struct msm_bus_vectors vidc_vdec_1080p_vectors[] = {
 	},
 };
 
+static struct msm_bus_vectors vidc_venc_1080p_turbo_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_VIDEO_ENC,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 222298112,
+		.ib  = 3522000000U,
+	},
+	{
+		.src = MSM_BUS_MASTER_VIDEO_DEC,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 330301440,
+		.ib  = 3522000000U,
+	},
+	{
+		.src = MSM_BUS_MASTER_AMPSS_M0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 2500000,
+		.ib  = 700000000,
+	},
+	{
+		.src = MSM_BUS_MASTER_AMPSS_M0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 2500000,
+		.ib  = 10000000,
+	},
+};
+static struct msm_bus_vectors vidc_vdec_1080p_turbo_vectors[] = {
+	{
+		.src = MSM_BUS_MASTER_VIDEO_ENC,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 222298112,
+		.ib  = 3522000000U,
+	},
+	{
+		.src = MSM_BUS_MASTER_VIDEO_DEC,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 330301440,
+		.ib  = 3522000000U,
+	},
+	{
+		.src = MSM_BUS_MASTER_AMPSS_M0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 2500000,
+		.ib  = 700000000,
+	},
+	{
+		.src = MSM_BUS_MASTER_AMPSS_M0,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab  = 2500000,
+		.ib  = 10000000,
+	},
+};
+
 static struct msm_bus_paths vidc_bus_client_config[] = {
 	{
 		ARRAY_SIZE(vidc_init_vectors),
@@ -1073,6 +1139,14 @@ static struct msm_bus_paths vidc_bus_client_config[] = {
 	{
 		ARRAY_SIZE(vidc_vdec_1080p_vectors),
 		vidc_vdec_1080p_vectors,
+	},
+	{
+		ARRAY_SIZE(vidc_venc_1080p_turbo_vectors),
+		vidc_venc_1080p_turbo_vectors,
+	},
+	{
+		ARRAY_SIZE(vidc_vdec_1080p_turbo_vectors),
+		vidc_vdec_1080p_turbo_vectors,
 	},
 };
 
@@ -1115,6 +1189,7 @@ struct msm_vidc_platform_data apq8064_vidc_platform_data = {
 	.disable_dmx = 0,
 	.disable_fullhd = 0,
 	.cont_mode_dpb_count = 18,
+	.fw_addr = 0x9fe00000,
 };
 
 struct platform_device apq8064_msm_device_vidc = {
@@ -1561,13 +1636,13 @@ struct platform_device msm_device_smd_apq8064 = {
 
 static struct resource resources_msm_pcie[] = {
 	{
-		.name   = "parf",
+		.name   = "pcie_parf",
 		.start  = PCIE20_PARF_PHYS,
 		.end    = PCIE20_PARF_PHYS + PCIE20_PARF_SIZE - 1,
 		.flags  = IORESOURCE_MEM,
 	},
 	{
-		.name   = "elbi",
+		.name   = "pcie_elbi",
 		.start  = PCIE20_ELBI_PHYS,
 		.end    = PCIE20_ELBI_PHYS + PCIE20_ELBI_SIZE - 1,
 		.flags  = IORESOURCE_MEM,
@@ -1576,18 +1651,6 @@ static struct resource resources_msm_pcie[] = {
 		.name   = "pcie20",
 		.start  = PCIE20_PHYS,
 		.end    = PCIE20_PHYS + PCIE20_SIZE - 1,
-		.flags  = IORESOURCE_MEM,
-	},
-	{
-		.name   = "axi_bar",
-		.start  = PCIE_AXI_BAR_PHYS,
-		.end    = PCIE_AXI_BAR_PHYS + PCIE_AXI_BAR_SIZE - 1,
-		.flags  = IORESOURCE_MEM,
-	},
-	{
-		.name   = "axi_conf",
-		.start  = PCIE_AXI_CONF_PHYS,
-		.end    = PCIE_AXI_CONF_PHYS + PCIE_AXI_CONF_SIZE - 1,
 		.flags  = IORESOURCE_MEM,
 	},
 };
@@ -1657,6 +1720,21 @@ static struct fs_driver_data ijpeg_fs_data = {
 	.bus_port0 = MSM_BUS_MASTER_JPEG_ENC,
 };
 
+static struct fs_driver_data mdp_fs_data = {
+	.clks = (struct fs_clk_data[]){
+		{ .name = "core_clk" },
+		{ .name = "iface_clk" },
+		{ .name = "bus_clk" },
+		{ .name = "vsync_clk" },
+		{ .name = "lut_clk" },
+		{ .name = "tv_src_clk" },
+		{ .name = "tv_clk" },
+		{ 0 }
+	},
+	.bus_port0 = MSM_BUS_MASTER_MDP_PORT0,
+	.bus_port1 = MSM_BUS_MASTER_MDP_PORT1,
+};
+
 static struct fs_driver_data rot_fs_data = {
 	.clks = (struct fs_clk_data[]){
 		{ .name = "core_clk" },
@@ -1709,10 +1787,11 @@ static struct fs_driver_data vcap_fs_data = {
 };
 
 struct platform_device *apq8064_footswitch[] __initdata = {
+	FS_8X60(FS_MDP,    "vdd",       "mdp.0",        &mdp_fs_data),
 	FS_8X60(FS_ROT,    "vdd",	"msm_rotator.0", &rot_fs_data),
 	FS_8X60(FS_IJPEG,  "vdd",	"msm_gemini.0",	&ijpeg_fs_data),
-	FS_8X60(FS_VFE,    "fs_vfe",	NULL,	&vfe_fs_data),
-	FS_8X60(FS_VPE,    "fs_vpe",	NULL,	&vpe_fs_data),
+	FS_8X60(FS_VFE,    "vdd",	"msm_vfe.0",	&vfe_fs_data),
+	FS_8X60(FS_VPE,    "vdd",	"msm_vpe.0",	&vpe_fs_data),
 	FS_8X60(FS_GFX3D,  "vdd",	"kgsl-3d0.0",	&gfx3d_fs_data),
 	FS_8X60(FS_VED,    "vdd",	"msm_vidc.0",	&ved_fs_data),
 	FS_8X60(FS_VCAP,   "vdd",	"msm_vcap.0",	&vcap_fs_data),
@@ -1824,6 +1903,7 @@ struct msm_rpm_platform_data apq8064_rpm_data __initdata = {
 		MSM_RPM_MAP(8064, HDMI_SWITCH, HDMI_SWITCH, 1),
 		MSM_RPM_MAP(8064, DDR_DMM_0, DDR_DMM, 2),
 		MSM_RPM_MAP(8064, QDSS_CLK, QDSS_CLK, 1),
+		MSM_RPM_MAP(8064, VDDMIN_GPIO, VDDMIN_GPIO, 1),
 	},
 	.target_status = {
 		MSM_RPM_STATUS_ID_MAP(8064, VERSION_MAJOR),
@@ -1957,6 +2037,7 @@ struct msm_rpm_platform_data apq8064_rpm_data __initdata = {
 		MSM_RPM_STATUS_ID_MAP(8064, PM8821_S2_1),
 		MSM_RPM_STATUS_ID_MAP(8064, PM8821_L1_0),
 		MSM_RPM_STATUS_ID_MAP(8064, PM8821_L1_1),
+		MSM_RPM_STATUS_ID_MAP(8064, VDDMIN_GPIO),
 	},
 	.target_ctrl_id = {
 		MSM_RPM_CTRL_MAP(8064, VERSION_MAJOR),
@@ -2178,6 +2259,7 @@ struct msm_mpm_device_data apq8064_mpm_dev_data __initdata = {
 #define AP2MDM_STATUS			48
 #define AP2MDM_SOFT_RESET		27
 #define AP2MDM_WAKEUP			35
+#define MDM2AP_PBLRDY			46
 
 static struct resource mdm_resources[] = {
 	{
@@ -2214,6 +2296,12 @@ static struct resource mdm_resources[] = {
 		.start	= AP2MDM_WAKEUP,
 		.end	= AP2MDM_WAKEUP,
 		.name	= "AP2MDM_WAKEUP",
+		.flags	= IORESOURCE_IO,
+	},
+	{
+		.start	= MDM2AP_PBLRDY,
+		.end	= MDM2AP_PBLRDY,
+		.name	= "MDM2AP_PBLRDY",
 		.flags	= IORESOURCE_IO,
 	},
 };
@@ -2284,13 +2372,21 @@ static struct msm_bus_vectors vcap_init_vectors[]  = {
 	},
 };
 
-
 static struct msm_bus_vectors vcap_480_vectors[]  = {
 	{
 		.src = MSM_BUS_MASTER_VIDEO_CAP,
 		.dst = MSM_BUS_SLAVE_EBI_CH0,
-		.ab = 1280 * 720 * 3 * 60,
-		.ib = 1280 * 720 * 3 * 60 * 1.5,
+		.ab = 480 * 720 * 3 * 60,
+		.ib = 480 * 720 * 3 * 60 * 1.5,
+	},
+};
+
+static struct msm_bus_vectors vcap_576_vectors[]  = {
+	{
+		.src = MSM_BUS_MASTER_VIDEO_CAP,
+		.dst = MSM_BUS_SLAVE_EBI_CH0,
+		.ab = 576 * 720 * 3 * 60,
+		.ib = 576 * 720 * 3 * 60 * 1.5,
 	},
 };
 
@@ -2320,6 +2416,10 @@ static struct msm_bus_paths vcap_bus_usecases[]  = {
 	{
 		ARRAY_SIZE(vcap_480_vectors),
 		vcap_480_vectors,
+	},
+	{
+		ARRAY_SIZE(vcap_576_vectors),
+		vcap_576_vectors,
 	},
 	{
 		ARRAY_SIZE(vcap_720_vectors),
@@ -2481,15 +2581,15 @@ struct msm_iommu_domain_name apq8064_iommu_ctx_names[] = {
 		.name = "jpegd_dst",
 		.domain = CAMERA_DOMAIN,
 	},
-	/* Rotator */
+	/* Rotator src*/
 	{
 		.name = "rot_src",
-		.domain = ROTATOR_DOMAIN,
+		.domain = ROTATOR_SRC_DOMAIN,
 	},
-	/* Rotator */
+	/* Rotator dst */
 	{
 		.name = "rot_dst",
-		.domain = ROTATOR_DOMAIN,
+		.domain = ROTATOR_DST_DOMAIN,
 	},
 	/* Video */
 	{
@@ -2545,18 +2645,36 @@ static struct mem_pool apq8064_camera_pools[] =  {
 		},
 };
 
-static struct mem_pool apq8064_display_pools[] =  {
+static struct mem_pool apq8064_display_read_pools[] =  {
 	[GEN_POOL] =
-	/* One address space for display */
+	/* One address space for display reads */
 		{
 			.paddr	= SZ_128K,
 			.size	= SZ_2G - SZ_128K,
 		},
 };
 
-static struct mem_pool apq8064_rotator_pools[] =  {
+static struct mem_pool apq8064_display_write_pools[] =  {
 	[GEN_POOL] =
-	/* One address space for rotator */
+	/* One address space for display writes */
+		{
+			.paddr	= SZ_128K,
+			.size	= SZ_2G - SZ_128K,
+		},
+};
+
+static struct mem_pool apq8064_rotator_src_pools[] =  {
+	[GEN_POOL] =
+	/* One address space for rotator src */
+		{
+			.paddr	= SZ_128K,
+			.size	= SZ_2G - SZ_128K,
+		},
+};
+
+static struct mem_pool apq8064_rotator_dst_pools[] =  {
+	[GEN_POOL] =
+	/* One address space for rotator dst */
 		{
 			.paddr	= SZ_128K,
 			.size	= SZ_2G - SZ_128K,
@@ -2572,13 +2690,21 @@ static struct msm_iommu_domain apq8064_iommu_domains[] = {
 			.iova_pools = apq8064_camera_pools,
 			.npools = ARRAY_SIZE(apq8064_camera_pools),
 		},
-		[DISPLAY_DOMAIN] = {
-			.iova_pools = apq8064_display_pools,
-			.npools = ARRAY_SIZE(apq8064_display_pools),
+		[DISPLAY_READ_DOMAIN] = {
+			.iova_pools = apq8064_display_read_pools,
+			.npools = ARRAY_SIZE(apq8064_display_read_pools),
 		},
-		[ROTATOR_DOMAIN] = {
-			.iova_pools = apq8064_rotator_pools,
-			.npools = ARRAY_SIZE(apq8064_rotator_pools),
+		[DISPLAY_WRITE_DOMAIN] = {
+			.iova_pools = apq8064_display_write_pools,
+			.npools = ARRAY_SIZE(apq8064_display_write_pools),
+		},
+		[ROTATOR_SRC_DOMAIN] = {
+			.iova_pools = apq8064_rotator_src_pools,
+			.npools = ARRAY_SIZE(apq8064_rotator_src_pools),
+		},
+		[ROTATOR_DST_DOMAIN] = {
+			.iova_pools = apq8064_rotator_dst_pools,
+			.npools = ARRAY_SIZE(apq8064_rotator_dst_pools),
 		},
 };
 

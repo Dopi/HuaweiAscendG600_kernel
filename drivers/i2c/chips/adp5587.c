@@ -32,7 +32,7 @@
 #include <linux/miscdevice.h>
 #include "huawei_qwerty.h"
 #include <asm/gpio.h>
-
+#include <linux/module.h>
 
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
 #include <linux/hw_dev_dec.h>

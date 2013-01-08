@@ -10,6 +10,7 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/module.h>
 #include <mach/camera.h>
 #include <media/v4l2-subdev.h>
 #include "msm.h"
@@ -42,7 +43,7 @@ int msm_gesture_subscribe_event(struct v4l2_subdev *sd, struct v4l2_fh *fh,
 	D("%s\n", __func__);
 	if (sub->type == V4L2_EVENT_ALL)
 		sub->type = MSM_GES_APP_NOTIFY_EVENT;
-	return v4l2_event_subscribe(fh, sub);
+	return v4l2_event_subscribe(fh, sub, 30);
 }
 
 static int msm_gesture_send_ctrl(struct msm_gesture_ctrl *p_gesture_ctrl,
@@ -230,7 +231,7 @@ static int msm_gesture_handle_event(struct v4l2_subdev *sd,
 
 	if (rc == 0) {
 		ktime_get_ts(&evt->timestamp);
-		v4l2_event_queue(&sd->devnode, evt);
+		v4l2_event_queue(sd->devnode, evt);
 	}
 	D("%s: exit rc %d ", __func__, rc);
 	return rc;
@@ -473,11 +474,10 @@ static int msm_gesture_node_register(void)
 
 	/* events */
 	gesture_subdev->flags |= V4L2_SUBDEV_FL_HAS_EVENTS;
-	gesture_subdev->nevents = MAX_GES_EVENTS;
 
 	msm_cam_register_subdev_node(gesture_subdev, GESTURE_DEV, 0);
 
-	gesture_subdev->entity.revision = gesture_subdev->devnode.num;
+	gesture_subdev->entity.revision = gesture_subdev->devnode->num;
 
 	atomic_set(&p_gesture_ctrl->active, 0);
 	p_gesture_ctrl->queue_id = -1;

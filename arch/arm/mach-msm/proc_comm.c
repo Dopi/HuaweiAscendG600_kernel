@@ -22,8 +22,8 @@
 #include <linux/module.h>
 #include <mach/msm_iomap.h>
 #include <mach/system.h>
+#include <mach/proc_comm.h>
 
-#include "proc_comm.h"
 #include "smd_private.h"
 
 static inline void notify_other_proc_comm(void)

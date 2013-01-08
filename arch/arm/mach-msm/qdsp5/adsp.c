@@ -1072,12 +1072,28 @@ int msm_adsp_generate_event(void *data,
 int msm_adsp_enable(struct msm_adsp_module *module)
 {
 	int rc = 0;
+	struct msm_adsp_module *module_en = NULL;
 
 	if (!module)
 		return -EINVAL;
 
 	MM_INFO("enable '%s'state[%d] id[%d]\n",
 				module->name, module->state, module->id);
+	if (!strncmp(module->name, "JPEGTASK", sizeof(module->name)))
+		module_en = find_adsp_module_by_name(&adsp_info, "VIDEOTASK");
+	else if (!strncmp(module->name, "VIDEOTASK", sizeof(module->name)))
+		module_en = find_adsp_module_by_name(&adsp_info, "JPEGTASK");
+	if (module_en) {
+		mutex_lock(&module_en->lock);
+		if (module_en->state == ADSP_STATE_ENABLED ||
+			module_en->state == ADSP_STATE_ENABLING) {
+			MM_ERR("both jpeg and video module can't"\
+				" exist at a time\n");
+			mutex_unlock(&module_en->lock);
+			return -EINVAL;
+		}
+		mutex_unlock(&module_en->lock);
+	}
 
 	mutex_lock(&module->lock);
 	switch (module->state) {
@@ -1262,7 +1278,7 @@ static int msm_adsp_probe(struct platform_device *pdev)
 			clk_set_rate(mod->clk, adsp_info.module[i].clk_rate);
 		mod->verify_cmd = adsp_info.module[i].verify_cmd;
 		mod->patch_event = adsp_info.module[i].patch_event;
-		INIT_HLIST_HEAD(&mod->pmem_regions);
+		INIT_HLIST_HEAD(&mod->ion_regions);
 		mod->pdev.name = adsp_info.module[i].pdev_name;
 		mod->pdev.id = -1;
 		adsp_info.id_to_module[i] = mod;

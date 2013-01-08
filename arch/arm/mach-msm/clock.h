@@ -29,11 +29,10 @@
 #define CLKFLAG_NOINVERT		0x00000002
 #define CLKFLAG_NONEST			0x00000004
 #define CLKFLAG_NORESET			0x00000008
-#define CLKFLAG_HANDOFF_RATE		0x00000010
 #define CLKFLAG_HWCG			0x00000020
 #define CLKFLAG_RETAIN			0x00000040
 #define CLKFLAG_NORETAIN		0x00000080
-#define CLKFLAG_SKIP_AUTO_OFF		0x00000200
+#define CLKFLAG_SKIP_HANDOFF		0x00000100
 #define CLKFLAG_MIN			0x00000400
 #define CLKFLAG_MAX			0x00000800
 
@@ -90,7 +89,6 @@ struct clk_ops {
 	int (*enable)(struct clk *clk);
 	void (*disable)(struct clk *clk);
 	void (*unprepare)(struct clk *clk);
-	void (*auto_off)(struct clk *clk);
 	void (*enable_hwcg)(struct clk *clk);
 	void (*disable_hwcg)(struct clk *clk);
 	int (*in_hwcg_mode)(struct clk *clk);
@@ -172,7 +170,7 @@ extern struct clock_init_data msm8x60_clock_init_data;
 extern struct clock_init_data qds8x50_clock_init_data;
 extern struct clock_init_data msm8625_dummy_clock_init_data;
 extern struct clock_init_data msm8930_clock_init_data;
-extern struct clock_init_data msmcopper_clock_init_data;
+extern struct clock_init_data msm8974_clock_init_data;
 
 void msm_clock_init(struct clock_init_data *data);
 int vote_vdd_level(struct clk_vdd_class *vdd_class, int level);

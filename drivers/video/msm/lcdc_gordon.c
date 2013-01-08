@@ -12,7 +12,7 @@
  */
 
 #include <linux/delay.h>
-#include <mach/gpio.h>
+#include <linux/gpio.h>
 #include "msm_fb.h"
 
 /* registers */

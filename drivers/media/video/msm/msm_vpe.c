@@ -11,12 +11,13 @@
  *
  */
 
+#include <linux/module.h>
 #include <linux/uaccess.h>
 #include <linux/interrupt.h>
 #include <mach/irqs.h>
 #include <linux/io.h>
 #include <linux/slab.h>
-#include <linux/pm_qos_params.h>
+#include <linux/pm_qos.h>
 #include <linux/regulator/consumer.h>
 #include <linux/clk.h>
 #include <mach/clk.h>

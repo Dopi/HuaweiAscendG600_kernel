@@ -142,19 +142,25 @@ struct ci13xxx {
 	struct ci13xxx_ep          ci13xxx_ep[ENDPT_MAX]; /* extended endpts */
 	u32                        ep0_dir;    /* ep0 direction */
 #define ep0out ci13xxx_ep[0]
-#define ep0in  ci13xxx_ep[16]
+#define ep0in  ci13xxx_ep[hw_ep_max / 2]
 	u8                         remote_wakeup; /* Is remote wakeup feature
 							enabled by the host? */
 	u8                         suspended;  /* suspended by the host */
 	u8                         configured;  /* is device configured */
 	u8                         test_mode;  /* the selected test mode */
 
+	struct delayed_work        rw_work;    /* remote wakeup delayed work */
 	struct usb_gadget_driver  *driver;     /* 3rd party gadget driver */
 	struct ci13xxx_udc_driver *udc_driver; /* device controller driver */
 	int                        vbus_active; /* is VBUS active */
 	int                        softconnect; /* is pull-up enable allowed */
-	struct otg_transceiver    *transceiver; /* Transceiver struct */
 	unsigned long dTD_update_fail_count;
+	struct usb_phy            *transceiver; /* Transceiver struct */
+};
+
+struct ci13xxx_platform_data {
+	u8 usb_core_id;
+	void *prv_data;
 };
 
 /******************************************************************************

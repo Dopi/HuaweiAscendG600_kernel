@@ -15,7 +15,7 @@
 
 #include <mach/irqs.h>
 #include <linux/mfd/pm8xxx/pm8018.h>
-#include <linux/regulator/gpio-regulator.h>
+#include <linux/regulator/msm-gpio-regulator.h>
 
 /*
  * MDM9x15 I2S.

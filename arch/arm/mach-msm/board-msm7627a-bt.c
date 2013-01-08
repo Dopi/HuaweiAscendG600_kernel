@@ -19,7 +19,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/mfd/marimba.h>
 #include <linux/io.h>
-#include <asm/gpio.h>
+#include <linux/gpio.h>
 #include <asm/mach-types.h>
 #include <mach/rpc_pmapp.h>
 #include <mach/socinfo.h>

@@ -31,12 +31,12 @@
 
 static void __iomem *l2x0_base;
 static DEFINE_RAW_SPINLOCK(l2x0_lock);
-
-static uint32_t l2x0_way_mask;	/* Bitmask of active ways */
-static uint32_t l2x0_size;
+static u32 l2x0_way_mask;	/* Bitmask of active ways */
+static u32 l2x0_size;
 static u32 l2x0_cache_id;
 static unsigned int l2x0_sets;
 static unsigned int l2x0_ways;
+static unsigned long sync_reg_offset = L2X0_CACHE_SYNC;
 static void pl310_save(void);
 
 static inline bool is_pl310_rev(int rev)
@@ -74,12 +74,7 @@ static inline void cache_sync(void)
 {
 	void __iomem *base = l2x0_base;
 
-#ifdef CONFIG_PL310_ERRATA_753970
-	/* write to an unmmapped register */
-	writel_relaxed(0, base + L2X0_DUMMY_REG);
-#else
-	writel_relaxed(0, base + L2X0_CACHE_SYNC);
-#endif
+	writel_relaxed(0, base + sync_reg_offset);
 	cache_wait(base + L2X0_CACHE_SYNC, 1);
 }
 
@@ -98,10 +93,13 @@ static inline void l2x0_inv_line(unsigned long addr)
 }
 
 #if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
+static inline void debug_writel(unsigned long val)
+{
+	if (outer_cache.set_debug)
+		outer_cache.set_debug(val);
+}
 
-#define debug_writel(val)	outer_cache.set_debug(val)
-
-static void l2x0_set_debug(unsigned long val)
+static void pl310_set_debug(unsigned long val)
 {
 	writel_relaxed(val, l2x0_base + L2X0_DEBUG_CTRL);
 }
@@ -111,7 +109,7 @@ static inline void debug_writel(unsigned long val)
 {
 }
 
-#define l2x0_set_debug	NULL
+#define pl310_set_debug	NULL
 #endif
 
 #ifdef CONFIG_PL310_ERRATA_588369
@@ -152,11 +150,11 @@ static void l2x0_for_each_set_way(void __iomem *reg)
 	unsigned long flags;
 
 	for (way = 0; way < l2x0_ways; way++) {
-		spin_lock_irqsave(&l2x0_lock, flags);
+		raw_spin_lock_irqsave(&l2x0_lock, flags);
 		for (set = 0; set < l2x0_sets; set++)
 			writel_relaxed((way << 28) | (set << 5), reg);
 		cache_sync();
-		spin_unlock_irqrestore(&l2x0_lock, flags);
+		raw_spin_unlock_irqrestore(&l2x0_lock, flags);
 	}
 }
 #endif
@@ -323,17 +321,6 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
 }
 
-void l2x0_flush_range_atomic(unsigned long start, unsigned long end)
-{
-	unsigned long addr;
-
-	start &= ~(CACHE_LINE_SIZE - 1);
-	for (addr = start; addr < end; addr += CACHE_LINE_SIZE)
-		writel_relaxed(addr, l2x0_base + L2X0_CLEAN_INV_LINE_PA);
-
-	mb();
-}
-
 static void l2x0_disable(void)
 {
 	unsigned long flags;
@@ -367,50 +354,51 @@ static void l2x0_unlock(u32 cache_id)
 void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
 {
 	u32 aux;
-	u32 cache_id;
 	u32 way_size = 0;
-	int ways;
 	const char *type;
 
 	l2x0_base = base;
-	cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
-	l2x0_cache_id = cache_id;
 
+	l2x0_cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
 	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
 
 	aux &= aux_mask;
 	aux |= aux_val;
 
 	/* Determine the number of ways */
-	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
+	switch (l2x0_cache_id & L2X0_CACHE_ID_PART_MASK) {
 	case L2X0_CACHE_ID_PART_L310:
 		if (aux & (1 << 16))
-			ways = 16;
+			l2x0_ways = 16;
 		else
-			ways = 8;
+			l2x0_ways = 8;
 		type = "L310";
+#ifdef CONFIG_PL310_ERRATA_753970
+		/* Unmapped register. */
+		sync_reg_offset = L2X0_DUMMY_REG;
+#endif
+		outer_cache.set_debug = pl310_set_debug;
 		break;
 	case L2X0_CACHE_ID_PART_L210:
-		ways = (aux >> 13) & 0xf;
+		l2x0_ways = (aux >> 13) & 0xf;
 		type = "L210";
 		break;
 	default:
 		/* Assume unknown chips have 8 ways */
-		ways = 8;
+		l2x0_ways = 8;
 		type = "L2x0 series";
 		break;
 	}
-	writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
-	l2x0_way_mask = (1 << ways) - 1;
+
+	l2x0_way_mask = (1 << l2x0_ways) - 1;
 
 	/*
 	 * L2 cache Size =  Way size * Number of ways
 	 */
 	way_size = (aux & L2X0_AUX_CTRL_WAY_SIZE_MASK) >> 17;
-	way_size = 1 << (way_size + 3);
-	l2x0_size = ways * way_size * SZ_1K;
+	way_size = SZ_1K << (way_size + 3);
+	l2x0_size = l2x0_ways * way_size;
 	l2x0_sets = way_size / CACHE_LINE_SIZE;
-	l2x0_ways = ways;
 
 	/*
 	 * Check if l2x0 controller is already enabled.
@@ -419,7 +407,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
 	 */
 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
 		/* Make sure that I&D is not locked down when starting */
-		l2x0_unlock(cache_id);
+		l2x0_unlock(l2x0_cache_id);
 
 		/* l2x0 controller is disabled */
 		writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
@@ -432,20 +420,17 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
 		writel_relaxed(1, l2x0_base + L2X0_CTRL);
 	}
 
-	outer_cache.inv_range = l2x0_inv_range;
-	outer_cache.clean_range = l2x0_clean_range;
-	outer_cache.flush_range = l2x0_flush_range;
+		outer_cache.inv_range = l2x0_inv_range;
+		outer_cache.clean_range = l2x0_clean_range;
+		outer_cache.flush_range = l2x0_flush_range;
 	outer_cache.sync = l2x0_cache_sync;
-
 	outer_cache.flush_all = l2x0_flush_all;
 	outer_cache.inv_all = l2x0_inv_all;
 	outer_cache.disable = l2x0_disable;
-	outer_cache.set_debug = l2x0_set_debug;
 
-	mb();
 	printk(KERN_INFO "%s cache controller enabled\n", type);
 	printk(KERN_INFO "l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x, Cache size: %d B\n",
-			ways, cache_id, aux, l2x0_size);
+			l2x0_ways, l2x0_cache_id, aux, l2x0_size);
 
 	/* Save the L2X0 contents, as they are not modified else where */
 	pl310_save();

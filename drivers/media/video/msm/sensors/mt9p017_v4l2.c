@@ -218,7 +218,7 @@ static struct msm_camera_i2c_reg_conf mt9p017_recommend_settings_2[] = {
 static struct msm_camera_i2c_reg_conf mt9p017_recommend_settings_3[] = {
 	//init 1
 	{0x301A, 0x0018}, //reset_register
-	{0x3064, 0x7800}, //smia_test_2lane_mipi
+	{0x3064, 0xB800}, //smia_test_2lane_mipi
 	{0x31AE, 0x0202}, //dual_lane_MIPI_interface
 	{0x0300, 0x0008},	// VT_PIX_CLK_DIV
 	{0x0302, 0x0001},	// VT_SYS_CLK_DIV
@@ -361,7 +361,7 @@ static struct msm_camera_i2c_reg_conf mt9p017_recommend_settings_5[] = {
 };
 static struct v4l2_subdev_info mt9p017_subdev_info[] = {
 	{
-	.code   = V4L2_MBUS_FMT_SGRBG10_1X10,
+	.code   = V4L2_MBUS_FMT_SBGGR10_1X10,
 	.colorspace = V4L2_COLORSPACE_JPEG,
 	.fmt    = 1,
 	.order    = 0,

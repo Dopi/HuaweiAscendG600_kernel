@@ -18,6 +18,7 @@
 #include <linux/regulator/driver.h>
 #include <linux/mfd/pm8xxx/core.h>
 #include <linux/regulator/pmic8901-regulator.h>
+#include <linux/module.h>
 
 /* Regulator types */
 #define REGULATOR_TYPE_LDO		0

@@ -23,6 +23,7 @@
 #include <linux/fs.h>
 
 #include <mach/irqs.h>
+#include <mach/msm_smsm.h>
 #include <mach/scm.h>
 #include <mach/peripheral-loader.h>
 #include <mach/subsystem_restart.h>
@@ -42,37 +43,37 @@ static struct gss_8064_data {
 
 static int crash_shutdown;
 
-static void gss_fatal_fn(struct work_struct *work)
+#define MAX_SSR_REASON_LEN 81U
+
+static void log_gss_sfr(void)
 {
-	uint32_t panic_smsm_states = SMSM_RESET | SMSM_SYSTEM_DOWNLOAD;
-	uint32_t reset_smsm_states = SMSM_SYSTEM_REBOOT_USR |
-					SMSM_SYSTEM_PWRDWN_USR;
-	uint32_t gss_state;
+	u32 size;
+	char *smem_reason, reason[MAX_SSR_REASON_LEN];
 
-	pr_err("Watchdog bite received from GSS!\n");
-
-	gss_state = smsm_get_state(SMSM_MODEM_STATE);
-
-	if (gss_state & panic_smsm_states) {
-
-		pr_err("GSS SMSM state changed to SMSM_RESET.\n"
-			"Probable err_fatal on the GSS. "
-			"Calling subsystem restart...\n");
-		subsystem_restart("gss");
-
-	} else if (gss_state & reset_smsm_states) {
-
-		pr_err("%s: User-invoked system reset/powerdown. "
-			"Resetting the SoC now.\n",
-			__func__);
-		kernel_restart(NULL);
-	} else {
-		/* TODO: Bus unlock code/sequence goes _here_ */
-		subsystem_restart("gss");
+	smem_reason = smem_get_entry(SMEM_SSR_REASON_MSS0, &size);
+	if (!smem_reason || !size) {
+		pr_err("GSS subsystem failure reason: (unknown, smem_get_entry failed).\n");
+		return;
 	}
+	if (!smem_reason[0]) {
+		pr_err("GSS subsystem failure reason: (unknown, init string found).\n");
+		return;
+	}
+
+	size = min(size, MAX_SSR_REASON_LEN-1);
+	memcpy(reason, smem_reason, size);
+	reason[size] = '\0';
+	pr_err("GSS subsystem failure reason: %s.\n", reason);
+
+	smem_reason[0] = '\0';
+	wmb();
 }
 
-static DECLARE_WORK(gss_fatal_work, gss_fatal_fn);
+static void restart_gss(void)
+{
+	log_gss_sfr();
+	subsystem_restart("gss");
+}
 
 static void smsm_state_cb(void *data, uint32_t old_state, uint32_t new_state)
 {
@@ -84,7 +85,7 @@ static void smsm_state_cb(void *data, uint32_t old_state, uint32_t new_state)
 		pr_err("GSS SMSM state changed to SMSM_RESET.\n"
 			"Probable err_fatal on the GSS. "
 			"Calling subsystem restart...\n");
-		subsystem_restart("gss");
+		restart_gss();
 	}
 }
 
@@ -150,8 +151,8 @@ out:
 
 static irqreturn_t gss_wdog_bite_irq(int irq, void *dev_id)
 {
-	schedule_work(&gss_fatal_work);
-	disable_irq_nosync(GSS_A5_WDOG_EXPIRED);
+	pr_err("Watchdog bite received from GSS!\n");
+	restart_gss();
 
 	return IRQ_HANDLED;
 }
@@ -242,7 +243,7 @@ static int __init gss_8064_init(void)
 		goto out;
 	}
 
-	gss_data.smem_ramdump_dev = create_ramdump_device("smem");
+	gss_data.smem_ramdump_dev = create_ramdump_device("smem-gss");
 
 	if (!gss_data.smem_ramdump_dev) {
 		pr_err("%s: Unable to create smem ramdump device. (%d)\n",

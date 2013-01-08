@@ -500,7 +500,11 @@ static struct msm_camera_i2c_reg_conf mt9v113_recommend_settings_4_mirror_flip[]
 static struct msm_camera_i2c_reg_conf mt9v113_recommend_settings_5[] =
 {      
 	{0x098C, 0xA20C}, 
-	{0x0990, 0x0008}, 
+	{0x0990, 0x0010}, 
+	{0x098C, 0xA215}, 
+	{0x0990, 0x0010}, 
+	{0x098C, 0x2212}, 
+	{0x0990, 0x0180}, 
 	{0x098C, 0xA24F}, 
 	{0x0990, 0x0038}, 
 
@@ -613,13 +617,13 @@ static struct msm_camera_i2c_reg_conf mt9v113_recommend_settings_5[] =
 	{0x098C, 0xAB22}, 	
 	{0x0990, 0x0002}, 	
 	{0x098C, 0xAB24}, 	
-	{0x0990, 0x0005}, 	
+	{0x0990, 0x0000}, 
 	{0x098C, 0x2B28}, 	
 	{0x0990, 0x170C}, 	
 	{0x098C, 0x2B2A}, 	
 	{0x0990, 0x3E80}, 	
 	{0x098C, 0xA103}, 	
-	{0x0990, 0x0006}, 	
+	{0x0990, 0x0006}, 
 };
 static struct msm_camera_i2c_reg_conf mt9v113_recommend_settings_6[] =
 {     
@@ -874,13 +878,13 @@ int32_t mt9v113_wait(struct msm_sensor_ctrl_t *s_ctrl,  int time)
 	int            count = 0;
 	unsigned short r_value = 0;
 	unsigned short bit15 = 0;
-
+	/* modify the delay time for CPU 1.4G */
 	/*modify delays and polls after register writing*/
 	switch(time){
 		case 0:
 		case 2:
 		case 3:
-			mdelay(10);
+			mdelay(30);
 			break;
 		case 1:
 			for(count = 50; count > 0; count --)
@@ -907,7 +911,7 @@ int32_t mt9v113_wait(struct msm_sensor_ctrl_t *s_ctrl,  int time)
 				if(0 == r_value) 
 				{
 					if( 5 == time)
-						mdelay(300);
+						mdelay(100);
 					break;
 				}
 				mdelay(10);
@@ -942,7 +946,7 @@ int32_t mt9v113_write_init_settings(struct msm_sensor_ctrl_t *s_ctrl)
 void  mt9v113_set_mirror_mode(struct msm_sensor_ctrl_t *s_ctrl)
 {
 
-	if (HW_MIRROR_AND_FLIP == get_hw_camera_mirror_type()) 
+	if (HW_MIRROR_AND_FLIP == (get_hw_camera_mirror_type() >> 1)) 
 	{
 		s_ctrl->msm_sensor_reg->init_settings[3].conf = &mt9v113_recommend_settings_4_mirror_flip[0];
 		s_ctrl->msm_sensor_reg->init_settings[3].size = ARRAY_SIZE(mt9v113_recommend_settings_4_mirror_flip);
@@ -961,6 +965,7 @@ int32_t mt9v113_sensor_model_match(struct msm_sensor_ctrl_t *s_ctrl)
 	* bit[9] of register 0x1070 is the value of GPIO[1] signal, so we read
 	* the value of 0x1070 and move right 9 bits to get the GPIO[1] value
 	*/
+
 	rc = msm_camera_i2c_write(
 					s_ctrl->sensor_i2c_client, 
 					0x098C,0x1070, 
@@ -1086,6 +1091,101 @@ void mt9v113_sensor_mclk_self_adapt(struct msm_sensor_ctrl_t *s_ctrl)
     }
     
 }
+int32_t mt9v113_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
+{
+	int32_t rc = 0;
+	static struct msm_cam_clk_info clk_info[] = {
+	{"cam_clk", MSM_SENSOR_MCLK_24HZ},
+	};
+	struct msm_camera_sensor_info *data = s_ctrl->sensordata;
+	CDBG("%s: %d\n", __func__, __LINE__);
+	s_ctrl->reg_ptr = kzalloc(sizeof(struct regulator *)
+			* data->sensor_platform_info->num_vreg, GFP_KERNEL);
+	if (!s_ctrl->reg_ptr) {
+		pr_err("%s: could not allocate mem for regulators\n",
+			__func__);
+		return -ENOMEM;
+	}
+
+	rc = msm_camera_request_gpio_table(data, 1);
+	if (rc < 0) {
+		pr_err("%s: request gpio failed\n", __func__);
+		goto request_gpio_failed;
+	}
+
+	if (s_ctrl->clk_rate != 0)
+		clk_info->clk_rate = s_ctrl->clk_rate;
+
+	rc = msm_cam_clk_enable(&s_ctrl->sensor_i2c_client->client->dev,
+		clk_info, &s_ctrl->cam_clk, ARRAY_SIZE(clk_info), 1);
+	if (rc < 0) {
+		pr_err("%s: clk enable failed\n", __func__);
+		goto enable_clk_failed;
+	}
+      if(data->standby_is_supported)
+      {
+           csi_config = 0;
+      }
+	/* power up one time in standby mode */
+      if((false == data->standby_is_supported) 
+         || (0 == strcmp(data->sensor_name, ""))
+         || (false == standby_mode))
+      {
+           rc = msm_camera_config_vreg(&s_ctrl->sensor_i2c_client->client->dev,
+    			s_ctrl->sensordata->sensor_platform_info->cam_vreg,
+    			s_ctrl->sensordata->sensor_platform_info->num_vreg,
+    			s_ctrl->reg_ptr, 1);
+    	    if (rc < 0) {
+    		pr_err("%s: regulator on failed\n", __func__);
+    		goto config_vreg_failed;
+    	    }
+
+    	    rc = msm_camera_enable_vreg(&s_ctrl->sensor_i2c_client->client->dev,
+    			s_ctrl->sensordata->sensor_platform_info->cam_vreg,
+    			s_ctrl->sensordata->sensor_platform_info->num_vreg,
+    			s_ctrl->reg_ptr, 1);
+    	    if (rc < 0) {
+    		pr_err("%s: enable regulator failed\n", __func__);
+    		goto enable_vreg_failed;
+    	    }
+       }
+	usleep_range(2000,3000);
+	rc = msm_camera_config_gpio_table(data, 1);
+	if (rc < 0) {
+		pr_err("%s: config gpio failed\n", __func__);
+		goto config_gpio_failed;
+	}
+	usleep_range(2000,3000);
+	if (data->sensor_platform_info->ext_power_ctrl != NULL)
+		data->sensor_platform_info->ext_power_ctrl(1);
+
+	if (data->sensor_platform_info->i2c_conf &&
+		data->sensor_platform_info->i2c_conf->use_i2c_mux)
+		msm_sensor_enable_i2c_mux(data->sensor_platform_info->i2c_conf);
+
+	return rc;
+	
+config_gpio_failed:
+	msm_camera_enable_vreg(&s_ctrl->sensor_i2c_client->client->dev,
+			s_ctrl->sensordata->sensor_platform_info->cam_vreg,
+			s_ctrl->sensordata->sensor_platform_info->num_vreg,
+			s_ctrl->reg_ptr, 0);
+enable_vreg_failed:
+	msm_camera_config_vreg(&s_ctrl->sensor_i2c_client->client->dev,
+		s_ctrl->sensordata->sensor_platform_info->cam_vreg,
+		s_ctrl->sensordata->sensor_platform_info->num_vreg,
+		s_ctrl->reg_ptr, 0);
+config_vreg_failed:
+	msm_cam_clk_enable(&s_ctrl->sensor_i2c_client->client->dev,
+		clk_info, &s_ctrl->cam_clk, ARRAY_SIZE(clk_info), 0);	
+enable_clk_failed:
+	msm_camera_request_gpio_table(data, 0);
+request_gpio_failed:
+	kfree(s_ctrl->reg_ptr);
+	return rc;
+}
+
+
 static struct v4l2_subdev_core_ops mt9v113_subdev_core_ops = {
 	.ioctl = msm_sensor_subdev_ioctl,
 	.s_power = msm_sensor_power,
@@ -1108,7 +1208,7 @@ static struct msm_sensor_fn_t mt9v113_func_tbl = {
 	.sensor_mode_init = msm_sensor_mode_init,
 	.sensor_get_output_info = msm_sensor_get_output_info,
 	.sensor_config = msm_sensor_config,
-	.sensor_power_up = msm_sensor_power_up,
+	.sensor_power_up = mt9v113_sensor_power_up,
 	.sensor_power_down = msm_sensor_power_down,
 	.sensor_write_init_settings = mt9v113_write_init_settings,
 	.sensor_model_match = mt9v113_sensor_model_match,

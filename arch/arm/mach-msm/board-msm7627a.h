@@ -65,6 +65,7 @@ enum {
 	QRD_GPIO_TP,
 	QRD_GPIO_CAM_GP_CAMIF_RESET,
 };
+
 #define ADSP_RPC_PROG           0x3000000a
 #if (defined(HUAWEI_BT_BLUEZ_VER30) || (!defined(CONFIG_HUAWEI_KERNEL)))
 
@@ -101,7 +102,6 @@ struct bt_vreg_info {
 void __init msm7627a_bt_power_init(void);
 #endif
 #if (defined(HUAWEI_BT_BTLA_VER30) && defined(CONFIG_HUAWEI_KERNEL))
-
 struct bt_vreg_info {
 	const char *name;
 	unsigned int pmapp_id;
@@ -114,11 +114,16 @@ struct bt_vreg_info {
 void __init msm7627a_bt_power_init(void);
 
 
+
 void bt_wake_msm_config(void);
 
 /*delete 2 lines, no need in this file again*/
 
 #endif
+
+extern struct platform_device msm_device_snd;
+extern struct platform_device msm_device_adspdec;
+extern struct platform_device msm_device_cad;
 
 void __init msm7627a_camera_init(void);
 int lcd_camera_power_onoff(int on);

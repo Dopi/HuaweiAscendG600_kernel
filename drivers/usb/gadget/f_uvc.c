@@ -8,7 +8,6 @@
  *	it under the terms of the GNU General Public License as published by
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
- *
  */
 
 #include <linux/kernel.h>
@@ -651,7 +650,7 @@ uvc_bind_config(struct usb_configuration *c,
 	if (ret)
 		kfree(uvc);
 
-	return 0;
+	return ret;
 
 error:
 	kfree(uvc);

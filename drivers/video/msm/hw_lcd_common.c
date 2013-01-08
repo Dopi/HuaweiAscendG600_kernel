@@ -272,7 +272,7 @@ void mipi_lcd_register_write(struct msm_fb_data_type *mfd,struct dsi_buf *tp,
 		dsi_cmd.dlen = param_num;
 		dsi_cmd.payload = mipi_packet_struct;
 		
-		mipi_dsi_cmds_tx(mfd, tp, &dsi_cmd,1);
+		mipi_dsi_cmds_tx( tp, &dsi_cmd,1);
 		packet_ok = FALSE;
 		param_num = 0;
 		last_datatype = 0;
@@ -324,23 +324,32 @@ void process_mipi_table(struct msm_fb_data_type *mfd,struct dsi_buf *tp,
         time = table[i].time;
 		switch(lcd_panel)
 		{
-			case MIPI_RSP61408_CHIMEI_WVGA:
-			case MIPI_RSP61408_BYD_WVGA:
-			case MIPI_RSP61408_TRULY_WVGA:
-			case MIPI_HX8357C_TIANMA_IPS_HVGA:
-			case MIPI_HX8357C_CHIMEI_HVGA:
-			case MIPI_HX8357C_TIANMA_HVGA:
-			case MIPI_HX8369A_TIANMA_WVGA:
-			case MIPI_HX8357C_CHIMEI_IPS_HVGA:
-			case MIPI_NT35516_TIANMA_QHD:
-			case MIPI_NT35516_CHIMEI_QHD:
-			case MIPI_NT35510_BOE_WVGA:
-			case MIPI_HX8369A_TIANMA_FWVGA:
-			case MIPI_OTM8009A_CHIMEI_WVGA:
-			case MIPI_NT35510_BOE_FWVGA:
-			case MIPI_NT35310_TIANMA_HVGA:
-			case MIPI_NT35310_BYD_HVGA:
-			case MIPI_NT35310_BOE_HVGA:
+			case MIPI_CMD_RSP61408_CHIMEI_WVGA:
+			case MIPI_CMD_RSP61408_BYD_WVGA:
+			case MIPI_CMD_RSP61408_TRULY_WVGA:
+			case MIPI_CMD_HX8357C_TIANMA_IPS_HVGA:
+			case MIPI_CMD_HX8357C_CHIMEI_HVGA:
+			case MIPI_CMD_HX8357C_TIANMA_HVGA:
+			case MIPI_CMD_HX8369A_TIANMA_WVGA:
+			case MIPI_VIDEO_HX8369B_TIANMA_WVGA:
+			case MIPI_CMD_HX8357C_CHIMEI_IPS_HVGA:
+			case MIPI_CMD_NT35516_TIANMA_QHD:
+			case MIPI_CMD_NT35516_CHIMEI_QHD:
+			case MIPI_CMD_NT35510_BOE_WVGA:
+			case MIPI_CMD_HX8369A_TIANMA_FWVGA:
+			case MIPI_CMD_OTM8009A_CHIMEI_WVGA:
+			/*Add otm8018b for video mode*/
+			case MIPI_VIDEO_OTM8018B_CHIMEI_WVGA:
+			/*Add nt35512 for video mode*/
+			case MIPI_VIDEO_NT35512_BOE_WVGA:
+			/*Add nt35512 video mode for byd*/
+			case MIPI_VIDEO_NT35512_BYD_WVGA:
+			case MIPI_CMD_NT35510_BOE_FWVGA:
+			case MIPI_CMD_NT35310_TIANMA_HVGA:
+			case MIPI_CMD_NT35310_BYD_HVGA:
+			case MIPI_CMD_NT35310_BOE_HVGA:
+			case MIPI_CMD_OTM8009A_CHIMEI_FWVGA:
+			case MIPI_CMD_NT35510_CHIMEI_WVGA:
 				mipi_lcd_register_write(mfd,tp,reg,value,0);
 				break;
 			default:
@@ -353,6 +362,54 @@ void process_mipi_table(struct msm_fb_data_type *mfd,struct dsi_buf *tp,
 	}
 			
 }
+#if (LCD_HX8369A_TIANMA_ESD_SIGN || LCD_OTM8009A_CMI_ESD_SIGN)
+/*****************************************
+  @brief   process mipi read sequence table
+  @param table: lcd init code, count: sizeof(table), read_data: data of registers
+			    mfd:mipi need ,tp: process mipi buffer, rp: read data buffer
+  @return none
+******************************************/
+
+int process_mipi_read_table(struct msm_fb_data_type *mfd,struct dsi_buf *tp,
+					struct dsi_buf *rp,struct read_sequence *table)
+{	
+	struct dsi_cmd_desc dsi_cmd;
+	uint32 datatype = 0;
+	uint8 reg = 0;
+	uint32 value = 0;
+	uint32 len = 0;
+	
+	reg = table[0].reg;
+    value = table[0].value;
+    len = table[0].len;
+	
+	if (MIPI_DCS_COMMAND == value)
+	{
+		datatype = DTYPE_DCS_READ;
+	}
+	else if (MIPI_GEN_COMMAND == value)
+	{
+		datatype = DTYPE_GEN_READ;
+	}
+	else
+	{
+		return -1;
+	}
+
+	dsi_cmd.dtype = datatype;
+	dsi_cmd.last = 1;
+	dsi_cmd.vc = 0;
+	dsi_cmd.ack = 1;
+	dsi_cmd.wait = 5;
+	dsi_cmd.dlen = 2;
+	dsi_cmd.payload = &reg;
+
+	mipi_dsi_cmds_rx(mfd, tp, rp, &dsi_cmd, len);
+	
+	return 0;
+
+}
+#endif
 #endif
 #ifdef CONFIG_FB_MSM_LCDC
 void seriout_ext(uint16 reg, uint16 data, uint16 time)
@@ -669,78 +726,10 @@ void truly_r61529_set_cs(struct msm_panel_common_pdata * lcdc_pnael_data){
 }
 
 #endif
-/* add nt35516 LCD to support daynamic gamma and auto CABC function */
-#ifdef CONFIG_FB_DYNAMIC_GAMMA
-/***************************************************************
-Function: is_panel_support_dynamic_gamma
-Description: Check whether the panel supports dynamic gamma function
-Parameters:
-	void
-Return:
-		1: Panel support dynamic gamma
-		0: Panel doesn't support dynamic gamma
-***************************************************************/
-int is_panel_support_dynamic_gamma(void)
-{
-	int ret = FALSE;
-	static lcd_panel_type lcd_panel = LCD_NONE;
 
-	if (lcd_panel == LCD_NONE)
-	{
-		lcd_panel = get_lcd_panel_type();
-	}
-	switch (lcd_panel)
-	{
-		case LCD_NT35560_TOSHIBA_FWVGA:
-		case MIPI_NT35516_TIANMA_QHD:
-		case MIPI_NT35516_CHIMEI_QHD:
-		case MIPI_NT35510_BOE_WVGA:
-		case MIPI_NT35510_BOE_FWVGA:
-			ret = TRUE;
-			break;
-		default:
-			ret = FALSE;
-			break;
-	}
-	return ret;
-}
-#endif
+/* remove the function is_panel_support_dynamic_gamma(void) */
+/* and is_panel_support_auto_cabc */
 
-#ifdef CONFIG_FB_AUTO_CABC
-/***************************************************************
-Function: is_panel_support_auto_cabc
-Description: Check whether the panel supports auto cabc function
-Parameters:
-	void
-Return:
-	1: Panel support cabc
-	0: Panel doesn't support cabc
-***************************************************************/
-/* add rsp61408 and hx8369a */
-int is_panel_support_auto_cabc(void)
-{
-	int ret = FALSE;
-	static lcd_panel_type lcd_panel = LCD_NONE;
-
-	lcd_panel = get_lcd_panel_type();
-	switch (lcd_panel)
-	{
-		case LCD_NT35560_TOSHIBA_FWVGA:
-		case MIPI_RSP61408_CHIMEI_WVGA:
-		case MIPI_HX8369A_TIANMA_WVGA:
-		case MIPI_NT35516_TIANMA_QHD:
-		case MIPI_NT35516_CHIMEI_QHD:
-		case MIPI_NT35510_BOE_WVGA:
-		case MIPI_NT35510_BOE_FWVGA:
-			ret = TRUE;
-			break;
-		default:
-			ret = FALSE;
-			break;
-	}
-	return ret;
-}
-#endif
 int lcd_reset(void)
 {
 	hw_lcd_interface_type lcd_interface_type=get_hw_lcd_interface_type();
@@ -748,7 +737,7 @@ int lcd_reset(void)
 	if((LCD_IS_MDDI_TYPE1 == lcd_interface_type)
 		||(LCD_IS_MDDI_TYPE2 == lcd_interface_type))
 	{
-		gpio_tlmm_config(GPIO_CFG(GPIO_OUT_31, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),1);
+		gpio_tlmm_config(GPIO_CFG(GPIO_OUT_31, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),GPIO_CFG_ENABLE);
 		gpio_set_value(GPIO_OUT_31,1);
 		LCD_MDELAY(1);
 		gpio_set_value(GPIO_OUT_31,0);
@@ -759,9 +748,11 @@ int lcd_reset(void)
 	else if((LCD_IS_MIPI_CMD == lcd_interface_type)
 		||(LCD_IS_MIPI_VIDEO == lcd_interface_type))
 	{
-		gpio_tlmm_config(GPIO_CFG(GPIO_OUT_129, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),1);
+		gpio_tlmm_config(GPIO_CFG(GPIO_OUT_129, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),GPIO_CFG_ENABLE);
+		gpio_set_value(GPIO_OUT_129,1);
+		LCD_MDELAY(1);
 		gpio_set_value(GPIO_OUT_129,0);
-		LCD_MDELAY(30);
+		LCD_MDELAY(5);
 		gpio_set_value(GPIO_OUT_129,1);
 		LCD_MDELAY(120);
 	}

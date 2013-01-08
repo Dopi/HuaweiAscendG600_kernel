@@ -26,6 +26,7 @@
 
 /* Bluetooth L2CAP sockets. */
 // rollback to original BlueZ
+#include <linux/module.h>
 
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>

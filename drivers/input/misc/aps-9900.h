@@ -61,6 +61,7 @@
 
 #define DETECTION_THRESHOLD	500
 
+#define PPCOUNT_REG_INDEX 4
 #define APDS9900_POWER_ON 1     /* set the APDS9900_ENABLE_REG's PON=1,Writing a 1 activates the APDS9900 */
 #define APDS9900_POWER_OFF 0    /* set the APDS9900_ENABLE_REG's PON=1,Writing a 0 disables the APDS9900 */
 /*reconfig reg after resume*/
@@ -101,6 +102,16 @@
 /* the values below are all experience value */
 #define CU8950_WAVE 113
 #define CU8950_WINDOW 193
+/* the values below are all experience value */
+#define Y300_WAVE 127
+#define Y300_WINDOW 300
+#define G510_WAVE 176
+#define G510_WINDOW 310
+/* the values below are all experience value */
+#define G510C_WAVE 137
+#define G510C_WINDOW 290
+#define H867G_WAVE 74
+#define H867G_WINDOW 221
 /* delete this part */
 
 static uint16_t lsensor_adc_table_u8655[LSENSOR_MAX_LEVEL] = {
@@ -139,5 +150,19 @@ static uint16_t lsensor_adc_table_c8812e[LSENSOR_MAX_LEVEL] = {
 /* the values below are all experience value */
 static uint16_t lsensor_adc_table_cu8950[LSENSOR_MAX_LEVEL] = {
 	29, 56, 260, 625, 795, 965, 1300
+};
+/* the values below are all experience value */
+static uint16_t lsensor_adc_table_g510[LSENSOR_MAX_LEVEL] = {
+	12,	30,	210, 560, 860, 1200, 1500
+};
+/* the values below are all experience value */
+static uint16_t lsensor_adc_table_g510c[LSENSOR_MAX_LEVEL] = {
+	12,	30,	210, 560, 860, 1200, 1500
+};
+static uint16_t lsensor_adc_table_y300[LSENSOR_MAX_LEVEL] = {
+	14,	32,	218, 576, 880, 1250, 1600
+};
+static uint16_t lsensor_adc_table_H867G[LSENSOR_MAX_LEVEL] = {
+	14, 40, 400, 740, 950, 1355, 3000
 };
 #endif /* _LINUX_APS_9900_H */

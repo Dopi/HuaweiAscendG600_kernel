@@ -3,7 +3,6 @@
  *
  *
  * Changes:
- * mazhenhua      :  for read appboot version and flash id.
  */
 
 #include <linux/types.h>
@@ -54,7 +53,7 @@
 #include <linux/touch_platform_config.h>
 #define PROC_MANUFACTURER_STR_LEN 30
 #define MAX_VERSION_CHAR 40
-#define BOARD_ID_LEN 20
+#define BOARD_ID_LEN 32
 /* Redefine board sub version id len here */
 #define BOARD_ID_SUB_VER_LEN 10
 #define LCD_NAME_LEN 20
@@ -95,7 +94,7 @@ const s_board_hw_version_type s_board_hw_version_table[] =
    {MACH_TYPE_MSM7X27A_H868C,"MSM7625A_H868C","HC1H868CM "},
    /*8x25 platform*/
    {MACH_TYPE_MSM8X25_C8833D,	"MSM8X25_C8833D",	"HD1C8833M "},
-   {MACH_TYPE_MSM8X25_C8951,	"MSM8X25_C8951",	"HC1C8951M "},
+   {MACH_TYPE_MSM8X25_C8813,	"MSM8X25_C8813",	"HC1C8813M "},
    {MACH_TYPE_MSM8X25_H881C,	"MSM8X25_H881C",	"HC1H881CM "},
    {MACH_TYPE_MSM8X25_C8825D,"MSM8X25_C8825D","HC1C8825M "},
    {MACH_TYPE_MSM8X25_U8825D,"MSM8X25_U8825D","HD1U8825M "},
@@ -239,6 +238,63 @@ static void set_s_board_hw_version_special(char *hw_version_id,char *hw_version_
        strcat(hw_version_id, hw_version_sub_ver);
        hw_version_id[HW_VERSION-1] = '\0';
     }
+    /* change the boardid name in the file of app_info according to the boardid sub version*/
+    /* HW_VER_U8951_VC is used as HW_VER_U8951N_1_VA, and is recorded as MSM8X25_U8951-1.VerC in app_info;
+     * HW_VER_U8951_VB is used as HW_VER_U8951_51_VA, and is recorded as MSM8X25_U8951-51.VerA in app_info;
+     * HW_VER_U8951_VA is used as HW_VER_U8951_1_VA, and is recorded as MSM8X25_U8951-1.VerA in app_info;
+     * HW_VER_U8833_VC is used as HW_VER_U8833N_1_VA, and is recorded as MSM8X25_U8833-1.VerC in app_info;
+     * HW_VER_U8833_VB is used as HW_VER_U8833_51_VA, and is recorded as MSM8X25_U8833-51.VerA in app_info;
+     * HW_VER_U8833_VA is used as HW_VER_U8833_1_VA, and is recorded as MSM8X25_U8833-1.VerA in app_info;
+     */
+    if(MACH_TYPE_MSM8X25_U8951 == machine_arch_type)
+    {
+        if(HW_VER_SUB_VA == get_hw_sub_board_id())
+        {
+            memcpy(s_board_id,"MSM8X25_U8951-1", BOARD_ID_LEN-1);
+            sprintf(sub_ver, ".Ver%c", 'A');
+            strcat(s_board_id, sub_ver);
+            s_board_id[BOARD_ID_LEN-1] = '\0';
+        }
+        else if(HW_VER_SUB_VB == get_hw_sub_board_id())
+        {
+            memcpy(s_board_id,"MSM8X25_U8951-51", BOARD_ID_LEN-1);
+            sprintf(sub_ver, ".Ver%c", 'A');
+            strcat(s_board_id, sub_ver);
+            s_board_id[BOARD_ID_LEN-1] = '\0';
+        }
+        else if(HW_VER_SUB_VC == get_hw_sub_board_id())
+        {
+            memcpy(s_board_id,"MSM8X25_U8951-1", BOARD_ID_LEN-1);
+            sprintf(sub_ver, ".Ver%c", 'C');
+            strcat(s_board_id, sub_ver);
+            s_board_id[BOARD_ID_LEN-1] = '\0';
+        }
+    }
+    
+    if(MACH_TYPE_MSM8X25_U8833 == machine_arch_type)
+    {
+        if(HW_VER_SUB_VA == get_hw_sub_board_id())
+        {
+            memcpy(s_board_id,"MSM8X25_U8833-1", BOARD_ID_LEN-1);
+            sprintf(sub_ver, ".Ver%c", 'A');
+            strcat(s_board_id, sub_ver);
+            s_board_id[BOARD_ID_LEN-1] = '\0';
+        }
+        else if(HW_VER_SUB_VB == get_hw_sub_board_id())
+        {
+            memcpy(s_board_id,"MSM8X25_U8833-51", BOARD_ID_LEN-1);
+            sprintf(sub_ver, ".Ver%c", 'A');
+            strcat(s_board_id, sub_ver);
+            s_board_id[BOARD_ID_LEN-1] = '\0';
+        }
+		else if(HW_VER_SUB_VC == get_hw_sub_board_id())
+        {
+            memcpy(s_board_id,"MSM8X25_U8833-1", BOARD_ID_LEN-1);
+            sprintf(sub_ver, ".Ver%c", 'C');
+            strcat(s_board_id, sub_ver);
+            s_board_id[BOARD_ID_LEN-1] = '\0';
+        }
+    }
 }
 
 
@@ -319,6 +375,7 @@ static int app_version_read_proc(char *page, char **start, off_t off,
 	char *ker_ver = HUAWEI_KERNEL_VERSION;
 	char *lcd_name = NULL;
 	char * touch_info = NULL;
+	char * battery_name = NULL;
 	char *wifi_device_name = NULL;
 	char *bt_device_name = NULL;
 	char audio_property[AUDIO_PROPERTY_LEN] = {0};
@@ -349,6 +406,11 @@ static int app_version_read_proc(char *page, char **start, off_t off,
 	{
 		touch_info = "Unknow touch";
 	}
+	battery_name = get_battery_manufacturer_info();
+	if (NULL == battery_name)
+	{
+		battery_name = "Unknown battery";
+	}
 	
 #ifdef CONFIG_HUAWEI_POWER_DOWN_CHARGE
     charge_flag = get_charge_flag();
@@ -369,8 +431,9 @@ static int app_version_read_proc(char *page, char **start, off_t off,
     "wifi_chip:\n%s\n"
     "bt_chip:\n%s\n"
 	"audio_property:\n%s\n"
-	"touch_info:\n%s\n",
-	appsboot_version, ker_ver, str_flash_nand_id, s_board_id, lcd_name, camera_id, ts_id,charge_flag, compass_gs_name,sensors_list_name, hw_version_id,wifi_device_name, bt_device_name, audio_property, touch_info);
+	"touch_info:\n%s\n"
+	"battery_id:\n%s\n",
+	appsboot_version, ker_ver, str_flash_nand_id, s_board_id, lcd_name, camera_id, ts_id,charge_flag, compass_gs_name,sensors_list_name, hw_version_id,wifi_device_name, bt_device_name, audio_property, touch_info, battery_name);
 #else
 	len = snprintf(page, PAGE_SIZE, "APPSBOOT:\n"
 	"%s\n"
@@ -386,8 +449,9 @@ static int app_version_read_proc(char *page, char **start, off_t off,
 	"sensors_list:\n%s\n"
 	"hw_version:\n%s\n"
 	"audio_property:\n%s\n"
-	"touch_info:\n%s\n",
-	appsboot_version, ker_ver, str_flash_nand_id, s_board_id, lcd_name, camera_id, ts_id, compass_gs_name,sensors_list_name, hw_version_id,audio_property, touch_info);
+	"touch_info:\n%s\n"
+	"battery_id:\n%s\n",
+	appsboot_version, ker_ver, str_flash_nand_id, s_board_id, lcd_name, camera_id, ts_id, compass_gs_name,sensors_list_name, hw_version_id,audio_property, touch_info, battery_name);
 #endif
 	
 	return proc_calc_metrics(page, start, off, count, eof, len);

@@ -21,6 +21,7 @@
 #include "msm.h"
 
 #define DBG_CSIC 0
+#include <linux/module.h>
 #define CSI_QC 1
 
 #define V4L2_IDENT_CSIC			50004
@@ -219,7 +220,6 @@ static int msm_csic_config(struct csic_cfg_params *cfg_params)
 	return rc;
 }
 
-/*this func is from the Qualcomm baseline*/
 static irqreturn_t msm_csic_irq(int irq_num, void *data)
 {
 	uint32_t irq;
@@ -237,6 +237,7 @@ static irqreturn_t msm_csic_irq(int irq_num, void *data)
 		pr_info("Unsupported packet format is received\n");
 	return IRQ_HANDLED;
 }
+
 static int msm_csic_subdev_g_chip_ident(struct v4l2_subdev *sd,
 			struct v4l2_dbg_chip_ident *chip)
 {

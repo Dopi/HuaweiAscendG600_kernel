@@ -20,6 +20,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/kref.h>
+#include <linux/mutex.h>
 #include <linux/platform_device.h>
 #include <linux/ratelimit.h>
 #include <linux/uaccess.h>
@@ -38,6 +39,7 @@ struct diag_bridge {
 	__u8			out_epAddr;
 	int			err;
 	struct kref		kref;
+	struct mutex		ifc_mutex;
 	struct diag_bridge_ops	*ops;
 	struct platform_device	*pdev;
 
@@ -80,7 +82,7 @@ void diag_bridge_close(void)
 {
 	struct diag_bridge	*dev = __dev;
 
-	dev_dbg(&dev->udev->dev, "%s:\n", __func__);
+	dev_dbg(&dev->ifc->dev, "%s:\n", __func__);
 
 	usb_kill_anchored_urbs(&dev->submitted);
 	dev->ops = 0;
@@ -93,11 +95,11 @@ static void diag_bridge_read_cb(struct urb *urb)
 	struct diag_bridge	*dev = urb->context;
 	struct diag_bridge_ops	*cbs = dev->ops;
 
-	dev_dbg(&dev->udev->dev, "%s: status:%d actual:%d\n", __func__,
+	dev_dbg(&dev->ifc->dev, "%s: status:%d actual:%d\n", __func__,
 			urb->status, urb->actual_length);
 
 	if (urb->status == -EPROTO) {
-		dev_err(&dev->udev->dev, "%s: proto error\n", __func__);
+		dev_err(&dev->ifc->dev, "%s: proto error\n", __func__);
 		/* save error so that subsequent read/write returns ENODEV */
 		dev->err = urb->status;
 		kref_put(&dev->kref, diag_bridge_delete);
@@ -124,32 +126,42 @@ int diag_bridge_read(char *data, int size)
 
 	pr_debug("reading %d bytes", size);
 
-	if (!dev || !dev->ifc) {
+	if (!dev) {
 		pr_err("device is disconnected");
 		return -ENODEV;
 	}
 
+	mutex_lock(&dev->ifc_mutex);
+	if (!dev->ifc) {
+		ret = -ENODEV;
+		goto error;
+	}
+
 	if (!dev->ops) {
 		pr_err("bridge is not open");
-		return -ENODEV;
+		ret = -ENODEV;
+		goto error;
 	}
 
 	if (!size) {
-		dev_err(&dev->udev->dev, "invalid size:%d\n", size);
-		return -EINVAL;
+		dev_err(&dev->ifc->dev, "invalid size:%d\n", size);
+		ret = -EINVAL;
+		goto error;
 	}
 
 	/* if there was a previous unrecoverable error, just quit */
-	if (dev->err)
-		return -ENODEV;
+	if (dev->err) {
+		ret = -ENODEV;
+		goto error;
+	}
 
 	kref_get(&dev->kref);
 
 	urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!urb) {
-		dev_err(&dev->udev->dev, "unable to allocate urb\n");
+		dev_err(&dev->ifc->dev, "unable to allocate urb\n");
 		ret = -ENOMEM;
-		goto error;
+		goto put_error;
 	}
 
 	ret = usb_autopm_get_interface(dev->ifc);
@@ -174,9 +186,11 @@ int diag_bridge_read(char *data, int size)
 
 free_error:
 	usb_free_urb(urb);
-error:
+put_error:
 	if (ret) /* otherwise this is done in the completion handler */
 		kref_put(&dev->kref, diag_bridge_delete);
+error:
+	mutex_unlock(&dev->ifc_mutex);
 	return ret;
 }
 EXPORT_SYMBOL(diag_bridge_read);
@@ -186,12 +200,12 @@ static void diag_bridge_write_cb(struct urb *urb)
 	struct diag_bridge	*dev = urb->context;
 	struct diag_bridge_ops	*cbs = dev->ops;
 
-	dev_dbg(&dev->udev->dev, "%s:\n", __func__);
+	dev_dbg(&dev->ifc->dev, "%s:\n", __func__);
 
 	usb_autopm_put_interface_async(dev->ifc);
 
 	if (urb->status == -EPROTO) {
-		dev_err(&dev->udev->dev, "%s: proto error\n", __func__);
+		dev_err(&dev->ifc->dev, "%s: proto error\n", __func__);
 		/* save error so that subsequent read/write returns ENODEV */
 		dev->err = urb->status;
 		kref_put(&dev->kref, diag_bridge_delete);
@@ -218,32 +232,42 @@ int diag_bridge_write(char *data, int size)
 
 	pr_debug("writing %d bytes", size);
 
-	if (!dev || !dev->ifc) {
+	if (!dev) {
 		pr_err("device is disconnected");
 		return -ENODEV;
 	}
 
+	mutex_lock(&dev->ifc_mutex);
+	if (!dev->ifc) {
+		ret = -ENODEV;
+		goto error;
+	}
+
 	if (!dev->ops) {
 		pr_err("bridge is not open");
-		return -ENODEV;
+		ret = -ENODEV;
+		goto error;
 	}
 
 	if (!size) {
-		dev_err(&dev->udev->dev, "invalid size:%d\n", size);
-		return -EINVAL;
+		dev_err(&dev->ifc->dev, "invalid size:%d\n", size);
+		ret = -EINVAL;
+		goto error;
 	}
 
 	/* if there was a previous unrecoverable error, just quit */
-	if (dev->err)
-		return -ENODEV;
+	if (dev->err) {
+		ret = -ENODEV;
+		goto error;
+	}
 
 	kref_get(&dev->kref);
 
 	urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!urb) {
-		dev_err(&dev->udev->dev, "unable to allocate urb\n");
+		dev_err(&dev->ifc->dev, "unable to allocate urb\n");
 		ret = -ENOMEM;
-		goto error;
+		goto put_error;
 	}
 
 	ret = usb_autopm_get_interface(dev->ifc);
@@ -255,6 +279,7 @@ int diag_bridge_write(char *data, int size)
 	pipe = usb_sndbulkpipe(dev->udev, dev->out_epAddr);
 	usb_fill_bulk_urb(urb, dev->udev, pipe, data, size,
 				diag_bridge_write_cb, dev);
+	urb->transfer_flags |= URB_ZERO_PACKET;
 	usb_anchor_urb(urb, &dev->submitted);
 	dev->pending_writes++;
 
@@ -269,9 +294,11 @@ int diag_bridge_write(char *data, int size)
 
 free_error:
 	usb_free_urb(urb);
-error:
+put_error:
 	if (ret) /* otherwise this is done in the completion handler */
 		kref_put(&dev->kref, diag_bridge_delete);
+error:
+	mutex_unlock(&dev->ifc_mutex);
 	return ret;
 }
 EXPORT_SYMBOL(diag_bridge_write);
@@ -388,6 +415,7 @@ diag_bridge_probe(struct usb_interface *ifc, const struct usb_device_id *id)
 	dev->udev = usb_get_dev(interface_to_usbdev(ifc));
 	dev->ifc = ifc;
 	kref_init(&dev->kref);
+	mutex_init(&dev->ifc_mutex);
 	init_usb_anchor(&dev->submitted);
 
 	ifc_desc = ifc->cur_altsetting;
@@ -411,7 +439,7 @@ diag_bridge_probe(struct usb_interface *ifc, const struct usb_device_id *id)
 	diag_bridge_debugfs_init();
 	platform_device_add(dev->pdev);
 
-	dev_dbg(&dev->udev->dev, "%s: complete\n", __func__);
+	dev_dbg(&dev->ifc->dev, "%s: complete\n", __func__);
 
 	return 0;
 
@@ -426,9 +454,12 @@ static void diag_bridge_disconnect(struct usb_interface *ifc)
 {
 	struct diag_bridge	*dev = usb_get_intfdata(ifc);
 
-	dev_dbg(&dev->udev->dev, "%s:\n", __func__);
+	dev_dbg(&dev->ifc->dev, "%s:\n", __func__);
 
 	platform_device_unregister(dev->pdev);
+	mutex_lock(&dev->ifc_mutex);
+	dev->ifc = NULL;
+	mutex_unlock(&dev->ifc_mutex);
 	diag_bridge_debugfs_cleanup();
 	kref_put(&dev->kref, diag_bridge_delete);
 	usb_set_intfdata(ifc, NULL);
@@ -443,7 +474,7 @@ static int diag_bridge_suspend(struct usb_interface *ifc, pm_message_t message)
 	if (cbs && cbs->suspend) {
 		ret = cbs->suspend(cbs->ctxt);
 		if (ret) {
-			dev_dbg(&dev->udev->dev,
+			dev_dbg(&dev->ifc->dev,
 				"%s: diag veto'd suspend\n", __func__);
 			return ret;
 		}

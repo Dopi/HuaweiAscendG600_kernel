@@ -19,6 +19,8 @@
 #include "devices.h"
 #include "board-8930.h"
 
+#ifdef CONFIG_MSM_CAMERA
+
 #if (defined(CONFIG_GPIO_SX150X) || defined(CONFIG_GPIO_SX150X_MODULE)) && \
 	defined(CONFIG_I2C)
 
@@ -183,7 +185,6 @@ static struct msm_gpiomux_config msm8930_cam_2d_configs[] = {
 	},
 };
 
-#ifdef CONFIG_MSM_CAMERA
 #define VFE_CAMIF_TIMER1_GPIO 2
 #define VFE_CAMIF_TIMER2_GPIO 3
 #define VFE_CAMIF_TIMER3_GPIO_INT 4
@@ -341,17 +342,11 @@ static struct msm_bus_scale_pdata cam_bus_client_pdata = {
 static struct msm_camera_device_platform_data msm_camera_csi_device_data[] = {
 	{
 		.csid_core = 0,
-		.is_csiphy = 1,
-		.is_csid   = 1,
-		.is_ispif  = 1,
 		.is_vpe    = 1,
 		.cam_bus_scale_table = &cam_bus_client_pdata,
 	},
 	{
 		.csid_core = 1,
-		.is_csiphy = 1,
-		.is_csid   = 1,
-		.is_ispif  = 1,
 		.is_vpe    = 1,
 		.cam_bus_scale_table = &cam_bus_client_pdata,
 	},

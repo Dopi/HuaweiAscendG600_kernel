@@ -11,7 +11,6 @@
 
 #include <linux/poll.h>
 #include <linux/fs.h>
-#include <linux/device.h>
 #include <linux/mutex.h>
 #include <linux/compiler.h> /* need __user */
 #include <linux/videodev2.h>
@@ -196,6 +195,10 @@ struct v4l2_ioctl_ops {
 					struct v4l2_crop *a);
 	int (*vidioc_s_crop)           (struct file *file, void *fh,
 					struct v4l2_crop *a);
+	int (*vidioc_g_selection)      (struct file *file, void *fh,
+					struct v4l2_selection *s);
+	int (*vidioc_s_selection)      (struct file *file, void *fh,
+					struct v4l2_selection *s);
 	/* Compression ioctls */
 	int (*vidioc_g_jpegcomp)       (struct file *file, void *fh,
 					struct v4l2_jpegcompression *a);

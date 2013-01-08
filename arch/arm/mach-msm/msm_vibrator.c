@@ -19,6 +19,7 @@
 #include <linux/err.h>
 #include <linux/hrtimer.h>
 #include <linux/sched.h>
+#include <linux/module.h>
 #include "pmic.h"
 #include "timed_output.h"
 
@@ -78,7 +79,6 @@ static void set_pmic_vibrator(int on)
 		pr_err("%s: Vibrator set voltage level failed", __func__);
 }
 #else
-
 static void set_pmic_vibrator(int on)
 {
 	static struct msm_rpc_endpoint *vib_endpoint;

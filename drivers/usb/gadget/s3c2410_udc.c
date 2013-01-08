@@ -3,23 +3,13 @@
  *
  * Samsung S3C24xx series on-chip full speed USB device controllers
  *
- * Copyright (C) 2004-2007 Herbert Pötzl - Arnaud Patard
+ * Copyright (C) 2004-2007 Herbert PÃ¶tzl - Arnaud Patard
  *	Additional cleanups by Ben Dooks <ben-linux@fluff.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
  */
 
 #include <linux/module.h>
@@ -47,7 +37,6 @@
 #include <asm/byteorder.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/system.h>
 #include <asm/unaligned.h>
 #include <mach/irqs.h>
 
@@ -61,7 +50,7 @@
 
 #define DRIVER_DESC	"S3C2410 USB Device Controller Gadget"
 #define DRIVER_VERSION	"29 Apr 2007"
-#define DRIVER_AUTHOR	"Herbert Pötzl <herbert@13thfloor.at>, " \
+#define DRIVER_AUTHOR	"Herbert PÃ¶tzl <herbert@13thfloor.at>, " \
 			"Arnaud Patard <arnaud.patard@rtp-net.org>"
 
 static const char		gadget_name[] = "s3c2410_udc";
@@ -1082,7 +1071,7 @@ static int s3c2410_udc_ep_enable(struct usb_ep *_ep,
 	if (!dev->driver || dev->gadget.speed == USB_SPEED_UNKNOWN)
 		return -ESHUTDOWN;
 
-	max = le16_to_cpu(desc->wMaxPacketSize) & 0x1fff;
+	max = usb_endpoint_maxp(desc) & 0x1fff;
 
 	local_irq_save (flags);
 	_ep->maxpacket = max & 0x7ff;
@@ -1158,6 +1147,7 @@ static int s3c2410_udc_ep_disable(struct usb_ep *_ep)
 	dprintk(DEBUG_NORMAL, "ep_disable: %s\n", _ep->name);
 
 	ep->desc = NULL;
+	ep->ep.desc = NULL;
 	ep->halted = 1;
 
 	s3c2410_udc_nuke (ep->dev, ep, -ESHUTDOWN);
@@ -1573,7 +1563,7 @@ static void s3c2410_udc_command(enum s3c2410_udc_cmd_e cmd)
 		return;
 
 	if (udc_info->udc_command) {
-		udc_info->udc_command(S3C2410_UDC_P_DISABLE);
+		udc_info->udc_command(cmd);
 	} else if (gpio_is_valid(udc_info->pullup_pin)) {
 		int value;
 
@@ -1640,6 +1630,7 @@ static void s3c2410_udc_reinit(struct s3c2410_udc *dev)
 
 		ep->dev = dev;
 		ep->desc = NULL;
+		ep->ep.desc = NULL;
 		ep->halted = 0;
 		INIT_LIST_HEAD (&ep->queue);
 	}
@@ -1693,9 +1684,9 @@ static int s3c2410_udc_start(struct usb_gadget_driver *driver,
 	if (udc->driver)
 		return -EBUSY;
 
-	if (!bind || !driver->setup || driver->speed < USB_SPEED_FULL) {
+	if (!bind || !driver->setup || driver->max_speed < USB_SPEED_FULL) {
 		printk(KERN_ERR "Invalid driver: bind %p setup %p speed %d\n",
-			bind, driver->setup, driver->speed);
+			bind, driver->setup, driver->max_speed);
 		return -EINVAL;
 	}
 #if defined(MODULE)
@@ -1903,7 +1894,7 @@ static int s3c2410_udc_probe(struct platform_device *pdev)
 
 	/* irq setup after old hardware state is cleaned up */
 	retval = request_irq(IRQ_USBD, s3c2410_udc_irq,
-			     IRQF_DISABLED, gadget_name, udc);
+			     0, gadget_name, udc);
 
 	if (retval != 0) {
 		dev_err(dev, "cannot get irq %i, err %d\n", IRQ_USBD, retval);
@@ -1927,7 +1918,7 @@ static int s3c2410_udc_probe(struct platform_device *pdev)
 		}
 
 		retval = request_irq(irq, s3c2410_udc_vbus_irq,
-				     IRQF_DISABLED | IRQF_TRIGGER_RISING
+				     IRQF_TRIGGER_RISING
 				     | IRQF_TRIGGER_FALLING | IRQF_SHARED,
 				     gadget_name, udc);
 
@@ -2057,26 +2048,23 @@ static int s3c2410_udc_resume(struct platform_device *pdev)
 #define s3c2410_udc_resume	NULL
 #endif
 
-static struct platform_driver udc_driver_2410 = {
-	.driver		= {
-		.name	= "s3c2410-usbgadget",
-		.owner	= THIS_MODULE,
-	},
-	.probe		= s3c2410_udc_probe,
-	.remove		= s3c2410_udc_remove,
-	.suspend	= s3c2410_udc_suspend,
-	.resume		= s3c2410_udc_resume,
+static const struct platform_device_id s3c_udc_ids[] = {
+	{ "s3c2410-usbgadget", },
+	{ "s3c2440-usbgadget", },
+	{ }
 };
+MODULE_DEVICE_TABLE(platform, s3c_udc_ids);
 
-static struct platform_driver udc_driver_2440 = {
+static struct platform_driver udc_driver_24x0 = {
 	.driver		= {
-		.name	= "s3c2440-usbgadget",
+		.name	= "s3c24x0-usbgadget",
 		.owner	= THIS_MODULE,
 	},
 	.probe		= s3c2410_udc_probe,
 	.remove		= s3c2410_udc_remove,
 	.suspend	= s3c2410_udc_suspend,
 	.resume		= s3c2410_udc_resume,
+	.id_table	= s3c_udc_ids,
 };
 
 static int __init udc_init(void)
@@ -2092,11 +2080,7 @@ static int __init udc_init(void)
 		s3c2410_udc_debugfs_root = NULL;
 	}
 
-	retval = platform_driver_register(&udc_driver_2410);
-	if (retval)
-		goto err;
-
-	retval = platform_driver_register(&udc_driver_2440);
+	retval = platform_driver_register(&udc_driver_24x0);
 	if (retval)
 		goto err;
 
@@ -2109,8 +2093,7 @@ err:
 
 static void __exit udc_exit(void)
 {
-	platform_driver_unregister(&udc_driver_2410);
-	platform_driver_unregister(&udc_driver_2440);
+	platform_driver_unregister(&udc_driver_24x0);
 	debugfs_remove(s3c2410_udc_debugfs_root);
 }
 
@@ -2121,5 +2104,3 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_VERSION(DRIVER_VERSION);
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:s3c2410-usbgadget");
-MODULE_ALIAS("platform:s3c2440-usbgadget");

@@ -28,17 +28,20 @@
 #include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/wakelock.h>
+#include <linux/pm_qos.h>
 
 #include <linux/msm_audio.h>
 
 #include <asm/atomic.h>
 #include <asm/ioctls.h>
 #include <mach/msm_adsp.h>
+#include <mach/cpuidle.h>
 
 #include "audmgr.h"
 
 #include <mach/qdsp5/qdsp5audppcmdi.h>
 #include <mach/qdsp5/qdsp5audppmsg.h>
+#include <mach/qdsp5/qdsp5audpp.h>
 
 #include <mach/htc_pwrsink.h>
 #include <mach/debug_mm.h>
@@ -109,7 +112,7 @@ module_init(_pcm_log_init);
 
 
 
-#define BUFSZ (960 * 5)
+#define BUFSZ (5248)
 #define DMASZ (BUFSZ * 2)
 
 #define COMMON_OBJ_ID 6
@@ -155,7 +158,7 @@ struct audio {
 	int stopped; /* set when stopped, cleared on flush */
 
 	struct wake_lock wakelock;
-	struct wake_lock idlelock;
+	struct pm_qos_request pm_qos_req;
 
 	audpp_cmd_cfg_object_params_volume vol_pan;
 };
@@ -204,13 +207,14 @@ static void audio_prevent_sleep(struct audio *audio)
 {
 	MM_DBG("\n"); /* Macro prints the file name and function */
 	wake_lock(&audio->wakelock);
-	wake_lock(&audio->idlelock);
+	pm_qos_update_request(&audio->pm_qos_req,
+			      msm_cpuidle_get_deep_idle_latency());
 }
 
 static void audio_allow_sleep(struct audio *audio)
 {
+	pm_qos_update_request(&audio->pm_qos_req, PM_QOS_DEFAULT_VALUE);
 	wake_unlock(&audio->wakelock);
-	wake_unlock(&audio->idlelock);
 	MM_DBG("\n"); /* Macro prints the file name and function */
 }
 
@@ -641,7 +645,7 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 }
 
 /* Only useful in tunnel-mode */
-static int audio_fsync(struct file *file,	int datasync)
+static int audio_fsync(struct file *file, loff_t a, loff_t b, int datasync)
 {
 	struct audio *audio = file->private_data;
 	int rc = 0;
@@ -814,7 +818,7 @@ static int audio_open(struct inode *inode, struct file *file)
 		goto done;
 
 	audio->out_buffer_size = BUFSZ;
-	audio->out_sample_rate = 44100;
+	audio->out_sample_rate = 48000;
 	audio->out_channel_mode = AUDPP_CMD_PCM_INTF_STEREO_V;
 	audio->out_weight = 100;
 
@@ -1147,7 +1151,8 @@ static int __init audio_init(void)
 	spin_lock_init(&the_audio.dsp_lock);
 	init_waitqueue_head(&the_audio.wait);
 	wake_lock_init(&the_audio.wakelock, WAKE_LOCK_SUSPEND, "audio_pcm");
-	wake_lock_init(&the_audio.idlelock, WAKE_LOCK_IDLE, "audio_pcm_idle");
+	pm_qos_add_request(&the_audio.pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
+				PM_QOS_DEFAULT_VALUE);
 	return (misc_register(&audio_misc) || misc_register(&audpp_misc));
 }
 

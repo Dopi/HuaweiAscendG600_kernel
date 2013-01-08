@@ -84,7 +84,7 @@
  */
 
 #include <linux/uaccess.h>
-#include <mach/gpio.h>
+#include <asm/gpio.h>
 #include <linux/module.h>
 #include <linux/nfc/pn544.h>
 #include <linux/interrupt.h>

@@ -171,9 +171,9 @@ static int __init mipi_cmd_nt35310_hvga_init(void)
     struct msm_panel_info *pinfo = NULL;
 
     lcd_panel_hvga = get_lcd_panel_type();
-    if (MIPI_NT35310_TIANMA_HVGA != lcd_panel_hvga 
-        && MIPI_NT35310_BYD_HVGA != lcd_panel_hvga
-        && MIPI_NT35310_BOE_HVGA != lcd_panel_hvga)
+    if (MIPI_CMD_NT35310_TIANMA_HVGA != lcd_panel_hvga 
+        && MIPI_CMD_NT35310_BYD_HVGA != lcd_panel_hvga
+        && MIPI_CMD_NT35310_BOE_HVGA != lcd_panel_hvga)
     {
         return 0;
     }

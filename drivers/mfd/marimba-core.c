@@ -24,6 +24,7 @@
 #include <linux/mfd/marimba.h>
 #include <linux/slab.h>
 #include <linux/debugfs.h>
+#include <linux/module.h>
 
 #define MARIMBA_MODE				0x00
 

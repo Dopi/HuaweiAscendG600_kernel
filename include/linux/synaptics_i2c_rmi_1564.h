@@ -18,6 +18,19 @@
 #ifndef _SYNPTICS_I2C_RMI_1564_H
 #define _SYNPTICS_I2C_RMI_1564_H
 
+#define BIT_IS_BOOTLOADER_MODE 0x40
+
+enum rmi_dev_status_code
+{
+    RMI_DEV_NO_ERROR        = 0x00,  //No Error
+    RMI_DEV_RESET_OCCURRED  = 0x01,  //Reset occurred
+    RMI_DEV_INVALID_CFG     = 0x02,  //Invalid Configuration
+    RMI_DEV_DEVICE_FAILURE  = 0x03,  //Device Failure
+    RMI_DEV_CFG_CRC_FAILURE = 0x04,  //Configuration CRC Failure
+    RMI_DEV_FW_CRC_FAILURE  = 0x05,  //Firmware CRC Failure
+    RMI_DEV_CRC_IN_PROGRESS = 0x06,  //CRC In Progress
+};
+
 #include <linux/interrupt.h>
 #include <linux/earlysuspend.h>
 

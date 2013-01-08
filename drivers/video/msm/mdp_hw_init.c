@@ -13,7 +13,6 @@
 
 #include "mdp.h"
 
-/* delete some line */
 /* mdp primary csc limit vector */
 uint32 mdp_plv[] = { 0x10, 0xeb, 0x10, 0xf0 };
 
@@ -631,7 +630,7 @@ void mdp_hw_init(void)
 	MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x01dc, 0);
 	MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x01e0, 0);
 	MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x01e4, 0);
-/* delete some line */
+
 #ifndef CONFIG_FB_MSM_MDP22
 	MDP_OUTP(MDP_BASE + 0xE0000, 0);
 	MDP_OUTP(MDP_BASE + 0x100, 0xffffffff);

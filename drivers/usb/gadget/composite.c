@@ -7,15 +7,6 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /* #define VERBOSE_DEBUG */
@@ -23,6 +14,7 @@
 #include <linux/kallsyms.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/module.h>
 #include <linux/device.h>
 #include <linux/utsname.h>
 
@@ -164,7 +156,7 @@ int config_ep_by_speed(struct usb_gadget *g,
 
 ep_found:
 	/* commit results */
-	_ep->maxpacket = le16_to_cpu(chosen_desc->wMaxPacketSize);
+	_ep->maxpacket = usb_endpoint_maxp(chosen_desc);
 	_ep->desc = chosen_desc;
 	_ep->comp_desc = NULL;
 	_ep->maxburst = 0;
@@ -626,25 +618,9 @@ static int set_config(struct usb_composite_dev *cdev,
 		result = 0;
 	}
 
-	INFO(cdev, "%s speed config #%d: %s\n",
-		({ char *speed;
-		switch (gadget->speed) {
-		case USB_SPEED_LOW:
-			speed = "low";
-			break;
-		case USB_SPEED_FULL:
-			speed = "full";
-			break;
-		case USB_SPEED_HIGH:
-			speed = "high";
-			break;
-		case USB_SPEED_SUPER:
-			speed = "super";
-			break;
-		default:
-			speed = "?";
-			break;
-		} ; speed; }), number, c ? c->label : "unconfigured");
+	INFO(cdev, "%s config #%d: %s\n",
+	     usb_speed_string(gadget->speed),
+	     number, c ? c->label : "unconfigured");
 
 	if (!c)
 		goto done;
@@ -760,7 +736,7 @@ int usb_add_config(struct usb_composite_dev *cdev,
 
 	INIT_LIST_HEAD(&config->functions);
 	config->next_interface_id = 0;
-	memset(config->interface, '\0', sizeof(config->interface));
+	memset(config->interface, 0, sizeof(config->interface));
 
 	status = bind(config);
 	if (status < 0) {
@@ -801,7 +777,7 @@ done:
 	return status;
 }
 
-static int remove_config(struct usb_composite_dev *cdev,
+static int unbind_config(struct usb_composite_dev *cdev,
 			      struct usb_configuration *config)
 {
 	while (!list_empty(&config->functions)) {
@@ -816,7 +792,6 @@ static int remove_config(struct usb_composite_dev *cdev,
 			/* may free memory for "f" */
 		}
 	}
-	list_del(&config->list);
 	if (config->unbind) {
 		DBG(cdev, "unbind config '%s'/%p\n", config->label, config);
 		config->unbind(config);
@@ -825,6 +800,15 @@ static int remove_config(struct usb_composite_dev *cdev,
 	return 0;
 }
 
+/**
+ * usb_remove_config() - remove a configuration from a device.
+ * @cdev: wraps the USB gadget
+ * @config: the configuration
+ *
+ * Drivers must call usb_gadget_disconnect before calling this function
+ * to disconnect the device from the host and make sure the host will not
+ * try to enumerate the device while we are changing the config list.
+ */
 int usb_remove_config(struct usb_composite_dev *cdev,
 		      struct usb_configuration *config)
 {
@@ -835,9 +819,11 @@ int usb_remove_config(struct usb_composite_dev *cdev,
 	if (cdev->config == config)
 		reset_config(cdev);
 
+	list_del(&config->list);
+
 	spin_unlock_irqrestore(&cdev->lock, flags);
 
-	return remove_config(cdev, config);
+	return unbind_config(cdev, config);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1125,10 +1111,12 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 			cdev->desc.bMaxPacketSize0 =
 				cdev->gadget->ep0->maxpacket;
 			if (gadget_is_superspeed(gadget)) {
-				if (gadget->speed >= USB_SPEED_SUPER)
+				if (gadget->speed >= USB_SPEED_SUPER) {
 					cdev->desc.bcdUSB = cpu_to_le16(0x0300);
-				else
+					cdev->desc.bMaxPacketSize0 = 9;
+				} else {
 					cdev->desc.bcdUSB = cpu_to_le16(0x0210);
+				}
 			}
 
 			value = min(w_length, (u16) sizeof cdev->desc);
@@ -1409,7 +1397,8 @@ composite_unbind(struct usb_gadget *gadget)
 		struct usb_configuration	*c;
 		c = list_first_entry(&cdev->configs,
 				struct usb_configuration, list);
-		remove_config(cdev, c);
+		list_del(&c->list);
+		unbind_config(cdev, c);
 	}
 	if (composite->unbind)
 		composite->unbind(cdev);
@@ -1594,9 +1583,9 @@ composite_resume(struct usb_gadget *gadget)
 
 static struct usb_gadget_driver composite_driver = {
 #ifdef CONFIG_USB_GADGET_SUPERSPEED
-	.speed		= USB_SPEED_SUPER,
+	.max_speed	= USB_SPEED_SUPER,
 #else
-	.speed		= USB_SPEED_HIGH,
+	.max_speed	= USB_SPEED_HIGH,
 #endif
 
 	.unbind		= composite_unbind,
@@ -1645,8 +1634,8 @@ int usb_composite_probe(struct usb_composite_driver *driver,
 		driver->iProduct = driver->name;
 	composite_driver.function =  (char *) driver->name;
 	composite_driver.driver.name = driver->name;
-	composite_driver.speed = min((u8)composite_driver.speed,
-				     (u8)driver->max_speed);
+	composite_driver.max_speed =
+		min_t(u8, composite_driver.max_speed, driver->max_speed);
 	composite = driver;
 	composite_gadget_bind = bind;
 

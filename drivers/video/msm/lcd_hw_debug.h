@@ -29,7 +29,16 @@ struct sequence{
     uint32_t value;
     uint32_t time; //unit is ms
 };
- 
+#define LCD_HX8369A_TIANMA_ESD_SIGN		1
+#define LCD_OTM8009A_CMI_ESD_SIGN	1
+
+#if (LCD_HX8369A_TIANMA_ESD_SIGN || LCD_OTM8009A_CMI_ESD_SIGN)
+struct read_sequence{
+	uint32_t reg;  //register
+	uint32_t value; //register's type
+	uint32_t len; // length of read parameters
+};
+#endif
 #define HW_LCD_INIT_TEST_PARAM "/data/hw_lcd_init_param.txt"
 #define HW_LCD_CONFIG_TABLE_MAX_NUM 600
 #define HW_LCD_CONFIGLINE_MAX 100

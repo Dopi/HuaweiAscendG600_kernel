@@ -11,15 +11,19 @@
  *
  */
 
-#include <asm/mach-types.h>
 #include <linux/i2c.h>
 #include <linux/gpio.h>
+
+#include <asm/mach-types.h>
+
 #include <mach/board.h>
 #include <mach/msm_bus_board.h>
 #include <mach/gpiomux.h>
 
 #include "devices.h"
 #include "board-8064.h"
+
+#ifdef CONFIG_MSM_CAMERA
 
 static struct gpiomux_setting cam_settings[] = {
 	{
@@ -98,7 +102,6 @@ static struct gpiomux_setting cam_settings[] = {
 	},
 
 };
-
 
 static struct msm_gpiomux_config apq8064_cam_common_configs[] = {
 	{
@@ -193,8 +196,6 @@ static struct msm_camera_sensor_flash_src msm_flash_src = {
 
 static struct msm_gpiomux_config apq8064_cam_2d_configs[] = {
 };
-
-#ifdef CONFIG_MSM_CAMERA
 
 static struct msm_bus_vectors cam_init_vectors[] = {
 	{
@@ -333,17 +334,11 @@ static struct msm_bus_scale_pdata cam_bus_client_pdata = {
 static struct msm_camera_device_platform_data msm_camera_csi_device_data[] = {
 	{
 		.csid_core = 0,
-		.is_csiphy = 1,
-		.is_csid   = 1,
-		.is_ispif  = 1,
 		.is_vpe    = 1,
 		.cam_bus_scale_table = &cam_bus_client_pdata,
 	},
 	{
 		.csid_core = 1,
-		.is_csiphy = 1,
-		.is_csid   = 1,
-		.is_ispif  = 1,
 		.is_vpe    = 1,
 		.cam_bus_scale_table = &cam_bus_client_pdata,
 	},

@@ -13,6 +13,7 @@
 #include <linux/err.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/bitops.h>
 #include <linux/mfd/pmic8058.h>

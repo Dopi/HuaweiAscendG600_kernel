@@ -1128,7 +1128,7 @@ static void audpreproc_pcm_send_data(struct audio_in *audio, unsigned needed)
 }
 
 
-static int audevrc_in_fsync(struct file *file,	int datasync)
+static int audevrc_in_fsync(struct file *file, loff_t ppos1, loff_t ppos2, int datasync)
 
 {
 	struct audio_in *audio = file->private_data;

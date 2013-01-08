@@ -11,6 +11,7 @@
  *
  */
 
+#include <linux/module.h>
 #include "msm_camera_eeprom.h"
 #include "msm_camera_i2c.h"
 

@@ -780,6 +780,8 @@ static int32_t mt9e013_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 		
 		s_ctrl->func_tbl->sensor_start_stream(s_ctrl);
 		msleep(50);
+		if(res == MSM_SENSOR_RES_QTR)
+		    is_first_preview_frame = 1;
 	}
 	return rc;
 }
@@ -1103,6 +1105,7 @@ static struct msm_sensor_fn_t mt9e013_func_tbl = {
 	.sensor_config = msm_sensor_config,
 	.sensor_power_up = msm_sensor_power_up,
 	.sensor_power_down = msm_sensor_power_down,
+	.sensor_get_csi_params = msm_sensor_get_csi_params,
 	.sensor_model_match = mt9e013_sensor_model_match,
 	.sensor_write_init_settings = mt9e013_write_init_settings,
 	.sensor_otp_reading = mt9e013_otp_reading,

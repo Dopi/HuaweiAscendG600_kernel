@@ -25,6 +25,7 @@ struct mmc_bus_ops {
 	int (*power_save)(struct mmc_host *);
 	int (*power_restore)(struct mmc_host *);
 	int (*alive)(struct mmc_host *);
+	int (*poweroff_notify)(struct mmc_host *, int notify);
 };
 
 void mmc_attach_bus(struct mmc_host *host, const struct mmc_bus_ops *ops);
@@ -48,9 +49,6 @@ void mmc_set_timing(struct mmc_host *host, unsigned int timing);
 void mmc_set_driver_type(struct mmc_host *host, unsigned int drv_type);
 void mmc_power_off(struct mmc_host *host);
 
-/*
- * we modified the function in order to make the mobile
- * easier to be waken up after update MMC code to QualComm 2020 kernel */
 static inline void mmc_delay(unsigned int ms)
 {
 #ifdef CONFIG_HUAWEI_KERNEL
@@ -78,7 +76,7 @@ int mmc_attach_sd(struct mmc_host *host);
 int mmc_attach_sdio(struct mmc_host *host);
 
 /* Module parameters */
-extern int use_spi_crc;
+extern bool use_spi_crc;
 
 /* Debugfs information for hosts and cards */
 void mmc_add_host_debugfs(struct mmc_host *host);

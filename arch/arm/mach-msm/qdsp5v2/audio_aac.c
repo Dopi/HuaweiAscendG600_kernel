@@ -1287,7 +1287,7 @@ static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	return rc;
 }
 /* Only useful in tunnel-mode */
-static int audaac_fsync(struct file *file, int datasync)
+static int audaac_fsync(struct file *file, loff_t ppos1, loff_t ppos2, int datasync)
 {
 	struct audio *audio = file->private_data;
 	struct buffer *frame;

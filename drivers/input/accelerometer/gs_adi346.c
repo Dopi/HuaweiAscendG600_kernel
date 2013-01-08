@@ -110,9 +110,36 @@
 #define RANGE_PM_4g	1
 #define RANGE_PM_8g	2
 #define RANGE_PM_16g	3
-
-
-
+/* DATA_CTRL_REG: controls the output data rate of the part */
+#define ODR12_5F     0x07   //Period   80ms
+#define ODR25F       0x08   //Period   40ms
+#define ODR50F       0x09   //Period   20ms
+#define ODR100F      0x0A   //Period   10ms
+#define ODR200F      0x0B   //Period    5ms
+#define ODR400F      0x0C   //Period  2.5ms
+#define ODR_MASK     0xF0
+/*This is the classcial Delay_time from framework and the units is ms*/
+#define DELAY_FASTEST  10
+#define DELAY_GAME     20
+#define DELAY_UI       68
+#define DELAY_NORMAL  200
+#define DELAY_ERROR 10000
+/*
+ * The following table lists the maximum appropriate poll interval for each
+ * available output data rate.
+ * Make sure the status still have proper timer.
+ */
+ 
+static const struct {
+	unsigned int cutoff;
+	u8 mask;
+} adi_odr_table[] = {
+	{ DELAY_FASTEST,ODR200F},
+	{ DELAY_GAME,   ODR100F},
+	{ DELAY_UI,      ODR25F},
+	{ DELAY_NORMAL,ODR12_5F},
+	{ DELAY_ERROR, ODR12_5F},
+};
 
 
 static unsigned model;
@@ -253,7 +280,36 @@ static int gs_data_to_compass(signed short accel_data [3])
 	accel_data[2]=st_sensor_data[2];
 	return 0;
 }
-
+static void gs_adi_update_odr(struct gs_data  *gs)
+{
+	int i;
+	int reg = 0;
+	int ret = 0;
+	short time_reg;
+	for (i = 0; i < ARRAY_SIZE(adi_odr_table); i++) 
+	{
+		time_reg = adi_odr_table[i].mask;
+		if (accel_delay <= adi_odr_table[i].cutoff)
+		{
+			accel_delay = adi_odr_table[i].cutoff;
+			break;
+		}
+	}
+	printk("Update G-sensor Odr ,delay_time is %d\n",accel_delay);
+	reg  = reg_read(gs, GS_ADI_REG_BW);
+	if( reg < 0 )
+	{
+		printk("Update_odr read register error \n");
+		return;
+	}
+	reg  = reg & ODR_MASK;
+	time_reg = time_reg | reg ;
+	ret  = reg_write(gs,GS_ADI_REG_BW,time_reg);
+	if(ret < 0)
+	{
+		printk("register write failed is gs_mma_update_odr\n ");
+	}
+}
 /**************************************************************************************/
 
 /*set register*/
@@ -329,6 +385,7 @@ gs_st_ioctl(struct file *file, unsigned int cmd,
 				accel_delay = flag;
 			else
 				accel_delay = 10;   /*10ms*/
+			gs_adi_update_odr(this_gs_data);
 			break;
 			
 		case ECS_IOCTL_APP_GET_DELAY:

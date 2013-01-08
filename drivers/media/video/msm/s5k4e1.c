@@ -10,6 +10,7 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/debugfs.h>
 #include <linux/types.h>
@@ -54,9 +55,9 @@ struct s5k4e1_work_t {
 };
 
 static struct s5k4e1_work_t *s5k4e1_sensorw;
-static struct i2c_client *s5k4e1_client;
 static struct s5k4e1_work_t *s5k4e1_af_sensorw;
 static struct i2c_client *s5k4e1_af_client;
+static struct i2c_client *s5k4e1_client;
 
 struct s5k4e1_ctrl_t {
 	const struct  msm_camera_sensor_info *sensordata;
@@ -403,7 +404,7 @@ static int32_t s5k4e1_set_pict_exp_gain(uint16_t gain, uint32_t line)
 	s5k4e1_i2c_write_b_sensor(0x0340, ll_pck_msb);
 	s5k4e1_i2c_write_b_sensor(0x0341, ll_pck_lsb);
 
-
+	/* Coarse Integration Time */
 	s5k4e1_i2c_write_b_sensor(0x0202, intg_time_msb);
 	s5k4e1_i2c_write_b_sensor(0x0203, intg_time_lsb);
 	s5k4e1_group_hold_off();
@@ -722,7 +723,7 @@ static int s5k4e1_probe_init_sensor(const struct msm_camera_sensor_info *data)
 	} else
 		goto gpio_req_fail;
 
-    msleep(20);
+	msleep(20);
 
 	s5k4e1_i2c_read(regaddress1, &chipid1, 1);
 	if (chipid1 != 0x4E) {
@@ -754,7 +755,6 @@ init_probe_fail:
 			gpio_free(data->vcm_pwd);
 		}
 	}
-
 gpio_req_fail:
 	return rc;
 }
@@ -850,12 +850,14 @@ static int s5k4e1_init_client(struct i2c_client *client)
 	init_waitqueue_head(&s5k4e1_wait_queue);
 	return 0;
 }
+
 static int s5k4e1_af_init_client(struct i2c_client *client)
 {
 	/* Initialize the MSM_CAMI2C Chip */
 	init_waitqueue_head(&s5k4e1_af_wait_queue);
 	return 0;
 }
+
 static const struct i2c_device_id s5k4e1_af_i2c_id[] = {
 	{"s5k4e1_af", 0},
 	{ }
@@ -947,6 +949,7 @@ static struct i2c_driver s5k4e1_i2c_driver = {
 		.name = "s5k4e1",
 	},
 };
+
 static struct i2c_driver s5k4e1_af_i2c_driver = {
 	.id_table = s5k4e1_af_i2c_id,
 	.probe  = s5k4e1_af_i2c_probe,
@@ -1128,7 +1131,6 @@ static int s5k4e1_sensor_probe(const struct msm_camera_sensor_info *info,
 #endif
 	gpio_set_value_cansleep(info->sensor_reset, 0);
 	s5k4e1_probe_init_done(info);
-
 	/* Keep vcm_pwd to OUT Low */
 	if (info->vcm_enable) { // info->vcm_enable) {
 		rc = gpio_request(info->vcm_pwd, "s5k4e1_af");

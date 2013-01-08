@@ -38,6 +38,7 @@ pen:
 	mvn	r7, #0			@ -1 to registers
 	str r7,[r6]			@ back to the pen for ack
 	b	secondary_startup
+ENDPROC(msm_secondary_startup)
 
 1:	.long	.
 	.long	pen_release

@@ -163,22 +163,29 @@ int tps61310_set_flash(unsigned led_state)
         tps61310_i2c_write( tps61310_client, 0x00, 0x80 );
         gpio_set_value(tps61310_strb0, 0);
         break;
-    case MSM_CAMERA_LED_MMI:
-	    printk("MSM_CAMERA_LED_MMI\n");
-        tps61310_i2c_write( tps61310_client,0x00, 0x08 );/*turn on led and then delay*/
-        tps61310_i2c_write( tps61310_client,0x05, 0x6F );
-        tps61310_i2c_write( tps61310_client,0x01, 0x40 );
-        tps61310_i2c_write( tps61310_client,0x02, 0x40 );
-        usleep(1000*200);
-       
-        tps61310_i2c_write( tps61310_client,0x00, 0x02 );/*switch to the other led*/
-        tps61310_i2c_write( tps61310_client,0x05, 0x6F );
-        tps61310_i2c_write( tps61310_client,0x01, 0x40 );
-        tps61310_i2c_write( tps61310_client,0x02, 0x40 );
-        usleep(1000*200);
-        tps61310_i2c_write( tps61310_client, 0x00, 0x80 );/*turn off*/
-        gpio_set_value(tps61310_strb0, 0);
-        break;
+    case MSM_CAMERA_LED_FIRST_MMI:
+	 printk("MSM_CAMERA_LED_FIRST_MMI\n");
+         tps61310_i2c_write( tps61310_client,0x00, 0x08 );/*turn on led and then delay*/
+         tps61310_i2c_write( tps61310_client,0x05, 0x6F );
+         tps61310_i2c_write( tps61310_client,0x01, 0x40 );
+         tps61310_i2c_write( tps61310_client,0x02, 0x40 );
+         usleep(1000*200);
+         
+         tps61310_i2c_write( tps61310_client, 0x00, 0x80 );/*turn off*/
+         gpio_set_value(tps61310_strb0, 0);
+         break;
+        
+    case MSM_CAMERA_LED_SECOND_MMI:
+       	 printk("MSM_CAMERA_LED_SECOND_MMI\n");
+         tps61310_i2c_write( tps61310_client,0x00, 0x02 );/*switch to the other led*/
+         tps61310_i2c_write( tps61310_client,0x05, 0x6F );
+         tps61310_i2c_write( tps61310_client,0x01, 0x40 );
+         tps61310_i2c_write( tps61310_client,0x02, 0x40 );
+         usleep(1000*200);
+         
+         tps61310_i2c_write( tps61310_client, 0x00, 0x80 );/*turn off*/
+         gpio_set_value(tps61310_strb0, 0);
+         break;
 
     default:
         tps61310_i2c_write( tps61310_client, 0x00, 0x80 );
@@ -261,6 +268,7 @@ static int tps61310_probe(struct i2c_client *client,
 		printk("tps61310 read chip id ok!\n");
 	} else {
 		printk("tps61310 read chip id error!\n");
+		return -ENODEV;
 	}
 
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT

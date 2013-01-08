@@ -53,7 +53,7 @@
 
 //#define BT_DBG(fmt, arg...)  printk(KERN_ERR "%s: " fmt "\n" , __func__ , ## arg)
 unsigned char fm_command_pending = 0;
-static int enable_mgmt = 1;
+static bool enable_mgmt = 1;
 
 /* ----- HCI socket interface ----- */
 

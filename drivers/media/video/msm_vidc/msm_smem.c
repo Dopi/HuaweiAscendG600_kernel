@@ -26,7 +26,7 @@ static int ion_user_to_kernel(struct smem_client *client,
 	unsigned long ionflag;
 	size_t len;
 	int rc = 0;
-	hndl = ion_import_fd(client->clnt, fd);
+	hndl = ion_import_dma_buf(client->clnt, fd);
 	if (IS_ERR_OR_NULL(hndl)) {
 		pr_err("Failed to get handle: %p, %d, %d, %p\n",
 				client, fd, offset, hndl);
@@ -69,6 +69,8 @@ static int alloc_ion_mem(struct smem_client *client, size_t size,
 	struct ion_handle *hndl;
 	size_t len;
 	int rc = 0;
+	if (size == 0)
+		goto skip_mem_alloc;
 	flags = flags | ION_HEAP(ION_CP_MM_HEAP_ID);
 	hndl = ion_alloc(client->clnt, size, align, flags);
 	if (IS_ERR_OR_NULL(hndl)) {
@@ -96,6 +98,7 @@ static int alloc_ion_mem(struct smem_client *client, size_t size,
 fail_map:
 	ion_free(client->clnt, hndl);
 fail_shared_mem_alloc:
+skip_mem_alloc:
 	return rc;
 }
 

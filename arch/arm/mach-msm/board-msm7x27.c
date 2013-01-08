@@ -13,7 +13,6 @@
  * GNU General Public License for more details.
  *
  */
-
 #include <linux/kernel.h>
 #include <linux/gpio.h>
 #include <linux/init.h>
@@ -66,7 +65,6 @@
 #include "board-msm7627-regulator.h"
 #include "devices.h"
 #include "clock.h"
-#include "acpuclock.h"
 #include "msm-keypad-devices.h"
 #include "pm.h"
 #include "pm-boot.h"
@@ -1776,7 +1774,7 @@ static void __init msm7x2x_init(void)
 		}
 	}
 #endif
-	acpuclk_init(&acpuclk_7x27_soc_data);
+	platform_device_register(&msm7x27_device_acpuclk);
 
 	usb_mpp_init();
 
@@ -1986,7 +1984,7 @@ static void __init msm7x2x_map_io(void)
 }
 
 MACHINE_START(MSM7X27_SURF, "QCT MSM7x27 SURF")
-	.boot_params	= PLAT_PHYS_OFFSET + 0x100,
+	.atag_offset	= 0x100,
 	.map_io		= msm7x2x_map_io,
 	.reserve	= msm7x27_reserve,
 	.init_irq	= msm7x2x_init_irq,
@@ -1997,7 +1995,7 @@ MACHINE_START(MSM7X27_SURF, "QCT MSM7x27 SURF")
 MACHINE_END
 
 MACHINE_START(MSM7X27_FFA, "QCT MSM7x27 FFA")
-	.boot_params	= PLAT_PHYS_OFFSET + 0x100,
+	.atag_offset	= 0x100,
 	.map_io		= msm7x2x_map_io,
 	.reserve	= msm7x27_reserve,
 	.init_irq	= msm7x2x_init_irq,
@@ -2008,7 +2006,7 @@ MACHINE_START(MSM7X27_FFA, "QCT MSM7x27 FFA")
 MACHINE_END
 
 MACHINE_START(MSM7X25_SURF, "QCT MSM7x25 SURF")
-	.boot_params	= PLAT_PHYS_OFFSET + 0x100,
+	.atag_offset	= 0x100,
 	.map_io		= msm7x2x_map_io,
 	.reserve	= msm7x27_reserve,
 	.init_irq	= msm7x2x_init_irq,
@@ -2019,7 +2017,7 @@ MACHINE_START(MSM7X25_SURF, "QCT MSM7x25 SURF")
 MACHINE_END
 
 MACHINE_START(MSM7X25_FFA, "QCT MSM7x25 FFA")
-	.boot_params	= PLAT_PHYS_OFFSET + 0x100,
+	.atag_offset	= 0x100,
 	.map_io		= msm7x2x_map_io,
 	.reserve	= msm7x27_reserve,
 	.init_irq	= msm7x2x_init_irq,

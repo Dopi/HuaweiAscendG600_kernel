@@ -112,10 +112,15 @@ int mdp4_atv_on(struct platform_device *pdev)
 
 	mdp4_overlay_dmae_xy(pipe);	/* dma_e */
 	mdp4_overlay_dmae_cfg(mfd, 1);
-
 	mdp4_overlay_rgb_setup(pipe);
 
 	mdp4_overlayproc_cfg(pipe);
+
+	mdp4_overlay_reg_flush(pipe, 1);
+
+	mdp4_mixer_stage_up(pipe, 0);
+	mdp4_mixer_stage_commit(pipe->mixer_num);
+
 /* config it once for tv_out */
 #ifdef CONFIG_HUAWEI_KERNEL	
 	if(first_time)
@@ -126,10 +131,6 @@ int mdp4_atv_on(struct platform_device *pdev)
 		first_time = FALSE;
 	}
 #endif
-
-	mdp4_overlay_reg_flush(pipe, 1);
-	mdp4_mixer_stage_up(pipe);
-
 	if (ret == 0)
 		mdp_pipe_ctrl(MDP_OVERLAY1_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 
@@ -152,7 +153,7 @@ int mdp4_atv_off(struct platform_device *pdev)
 
 	/* dis-engage rgb2 from mixer1 */
 	if (atv_pipe) {
-		mdp4_mixer_stage_down(atv_pipe);
+		mdp4_mixer_stage_down(atv_pipe, 1);
 		mdp4_iommu_unmap(atv_pipe);
 	}
 
@@ -195,10 +196,13 @@ void mdp4_atv_overlay(struct msm_fb_data_type *mfd)
 	} else {
 		pipe->srcp0_addr = (uint32)(buf + buf_offset);
 	}
+	mdp4_overlay_mdp_perf_req(pipe, mfd);
+	mdp4_overlay_mdp_perf_upd(mfd, 1);
 	mdp4_overlay_rgb_setup(pipe);
-	mdp4_overlay_reg_flush(pipe, 0);
-	mdp4_mixer_stage_up(pipe);
 
+	mdp4_overlay_reg_flush(pipe, 0);
+	mdp4_mixer_stage_up(pipe, 0);
+	mdp4_mixer_stage_commit(pipe->mixer_num);
 	printk(KERN_INFO "mdp4_atv_overlay: pipe=%x ndx=%d\n",
 					(int)pipe, pipe->pipe_ndx);
 
@@ -213,10 +217,7 @@ void mdp4_atv_overlay(struct msm_fb_data_type *mfd)
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
 	wait_for_completion_killable(&atv_pipe->comp);
 	mdp_disable_irq(MDP_OVERLAY1_TERM);
-
-	/* change mdp clk while mdp is idle` */
-	mdp4_set_perf_level();
-
+	mdp4_overlay_mdp_perf_upd(mfd, 0);
 	mdp4_stat.kickoff_atv++;
 	mutex_unlock(&mfd->dma->ov_mutex);
 }

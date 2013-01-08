@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 /*
    BlueZ - Bluetooth protocol stack for Linux
    Copyright (C) 2011 Nokia Corporation and/or its subsidiary(-ies).
@@ -28,6 +20,9 @@
    SOFTWARE IS DISCLAIMED.
 */
 // rollback to original BlueZ
+
+#include <linux/interrupt.h>
+#include <linux/module.h>
 
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
@@ -710,10 +705,6 @@ static u8 smp_cmd_security_req(struct l2cap_conn *conn, struct sk_buff *skb)
 invalid_key:
 	hcon->sec_req = FALSE;
 
-	/* Switch to Pairing Connection Parameters */
-	hci_le_conn_update(hcon, SMP_MIN_CONN_INTERVAL, SMP_MAX_CONN_INTERVAL,
-			SMP_MAX_CONN_LATENCY, SMP_SUPERVISION_TIMEOUT);
-
 	skb_pull(skb, sizeof(*rp));
 
 	memset(&cp, 0, sizeof(cp));
@@ -780,11 +771,6 @@ int smp_conn_security(struct l2cap_conn *conn, __u8 sec_level)
 
 	if (hcon->link_mode & HCI_LM_MASTER) {
 		struct smp_cmd_pairing cp;
-
-		/* Switch to Pairing Connection Parameters */
-		hci_le_conn_update(hcon, SMP_MIN_CONN_INTERVAL,
-				SMP_MAX_CONN_INTERVAL, SMP_MAX_CONN_LATENCY,
-				SMP_SUPERVISION_TIMEOUT);
 
 		build_pairing_cmd(conn, &cp, NULL, authreq);
 		hcon->preq[0] = SMP_CMD_PAIRING_REQ;

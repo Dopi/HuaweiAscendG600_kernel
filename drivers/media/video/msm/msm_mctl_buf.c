@@ -35,10 +35,11 @@
 #endif
 
 static int msm_vb2_ops_queue_setup(struct vb2_queue *vq,
-					unsigned int *num_buffers,
-					unsigned int *num_planes,
-					unsigned long sizes[],
-					void *alloc_ctxs[])
+				const struct v4l2_format *fmt,
+				unsigned int *num_buffers,
+				unsigned int *num_planes,
+				unsigned int sizes[],
+				void *alloc_ctxs[])
 {
 	/* get the video device */
 	struct msm_cam_v4l2_dev_inst *pcam_inst = vb2_get_drv_priv(vq);
@@ -53,9 +54,9 @@ static int msm_vb2_ops_queue_setup(struct vb2_queue *vq,
 
 	*num_planes = pcam_inst->plane_info.num_planes;
 	for (i = 0; i < pcam_inst->vid_fmt.fmt.pix_mp.num_planes; i++) {
-		sizes[i] = PAGE_ALIGN(pcam_inst->plane_info.plane[i].size);
-		D("%s Inst %p : Plane %d Offset = %d Size = %ld"
-			"Aligned Size = %ld", __func__, pcam_inst, i,
+		sizes[i] = pcam_inst->plane_info.plane[i].size;
+		D("%s Inst %p : Plane %d Offset = %d Size = %ld" \
+			"Aligned Size = %d\n", __func__, pcam_inst, i,
 			pcam_inst->plane_info.plane[i].offset,
 			pcam_inst->plane_info.plane[i].size, sizes[i]);
 	}
@@ -186,10 +187,8 @@ static int msm_vb2_ops_buf_finish(struct vb2_buffer *vb)
 	pcam = pcam_inst->pcam;
 	buf = container_of(vb, struct msm_frame_buffer, vidbuf);
 	buf->state = MSM_BUFFER_STATE_DEQUEUED;
-	D("%s: inst=0x%x, buf=0x, %x, idx=%d\n", __func__,
+	D("%s: inst=0x%x, buf=0x%x, idx=%d\n", __func__,
 	(uint32_t)pcam_inst, (uint32_t)buf, vb->v4l2_buf.index);
-	D("%s: inst=%p, buf=%x, idx=%d\n", __func__,
-	pcam_inst, (uint32_t)buf, vb->v4l2_buf.index);
 	return 0;
 }
 
@@ -259,7 +258,7 @@ static void msm_vb2_ops_buf_cleanup(struct vb2_buffer *vb)
 	buf->state = MSM_BUFFER_STATE_UNUSED;
 }
 
-static int msm_vb2_ops_start_streaming(struct vb2_queue *q)
+static int msm_vb2_ops_start_streaming(struct vb2_queue *q, unsigned int count)
 {
 	return 0;
 }
@@ -506,7 +505,8 @@ struct msm_cam_v4l2_dev_inst *msm_mctl_get_pcam_inst(
 		 * If mctl node doesnt have the instance, then
 		 * search in the user's video node */
 		if (pmctl->vfe_output_mode == VFE_OUTPUTS_MAIN_AND_THUMB
-		|| pmctl->vfe_output_mode == VFE_OUTPUTS_THUMB_AND_MAIN) {
+		|| pmctl->vfe_output_mode == VFE_OUTPUTS_THUMB_AND_MAIN
+		|| pmctl->vfe_output_mode == VFE_OUTPUTS_MAIN_AND_PREVIEW) {
 			if (pcam->mctl_node.dev_inst_map[image_mode]
 			&& is_buffer_queued(pcam, image_mode)) {
 				idx =
@@ -518,7 +518,7 @@ struct msm_cam_v4l2_dev_inst *msm_mctl_get_pcam_inst(
 			} else if (pcam->dev_inst_map[image_mode]) {
 				idx = pcam->dev_inst_map[image_mode]->my_index;
 				pcam_inst = pcam->dev_inst[idx];
-				D("%s Found instance %p in video device",
+				D("%s Found instance %p in video device\n",
 				__func__, pcam_inst);
 			}
 		} else {
@@ -531,7 +531,7 @@ struct msm_cam_v4l2_dev_inst *msm_mctl_get_pcam_inst(
 			} else if (pcam->dev_inst_map[image_mode]) {
 				idx = pcam->dev_inst_map[image_mode]->my_index;
 				pcam_inst = pcam->dev_inst[idx];
-				D("%s Found instance %p in video device",
+				D("%s Found instance %p in video device\n",
 				__func__, pcam_inst);
 			}
 		}
@@ -647,7 +647,7 @@ int msm_mctl_release_free_buf(struct msm_cam_media_controller *pmctl,
 		buf_phyaddr =
 			(uint32_t) videobuf2_to_pmem_contig(&buf->vidbuf, 0);
 		if (free_buf->ch_paddr[0] == buf_phyaddr) {
-			D("%s buf = 0x%x ", __func__, free_buf->ch_paddr[0]);
+			D("%s buf = 0x%x\n", __func__, free_buf->ch_paddr[0]);
 			buf->state = MSM_BUFFER_STATE_UNUSED;
 			rc = 0;
 			break;

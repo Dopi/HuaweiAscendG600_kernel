@@ -76,9 +76,25 @@ struct msm_pm_sleep_status_data {
 	uint32_t mask;
 };
 
+struct msm_pm_sleep_ops {
+	void *(*lowest_limits)(bool from_idle,
+			enum msm_pm_sleep_mode sleep_mode, uint32_t latency_us,
+			uint32_t sleep_us, uint32_t *power);
+	int (*enter_sleep)(uint32_t sclk_count, void *limits,
+			bool from_idle, bool notify_rpm);
+	void (*exit_sleep)(void *limits, bool from_idle,
+			bool notify_rpm, bool collapsed);
+};
+
+struct msm_pm_cpr_ops {
+	void (*cpr_suspend)(void);
+	void (*cpr_resume)(void);
+};
+
 void msm_pm_set_platform_data(struct msm_pm_platform_data *data, int count);
+int msm_pm_idle_prepare(struct cpuidle_device *dev,
+			struct cpuidle_driver *drv, int index);
 void msm_pm_set_irq_extns(struct msm_pm_irq_calls *irq_calls);
-int msm_pm_idle_prepare(struct cpuidle_device *dev);
 int msm_pm_idle_enter(enum msm_pm_sleep_mode sleep_mode);
 void msm_pm_cpu_enter_lowpower(unsigned int cpu);
 
@@ -90,12 +106,13 @@ void __init msm_pm_init_sleep_status_data(
 void msm_pm_set_rpm_wakeup_irq(unsigned int irq);
 int msm_pm_wait_cpu_shutdown(unsigned int cpu);
 bool msm_pm_verify_cpu_pc(unsigned int cpu);
+void msm_pm_set_sleep_ops(struct msm_pm_sleep_ops *ops);
 #else
 static inline void msm_pm_set_rpm_wakeup_irq(unsigned int irq) {}
 static inline int msm_pm_wait_cpu_shutdown(unsigned int cpu) { return 0; }
 static inline bool msm_pm_verify_cpu_pc(unsigned int cpu) { return true; }
+static inline void msm_pm_set_sleep_ops(struct msm_pm_sleep_ops *ops) {}
 #endif
-
 #ifdef CONFIG_HOTPLUG_CPU
 int msm_platform_secondary_init(unsigned int cpu);
 #else
@@ -125,5 +142,7 @@ static inline void msm_pm_add_stats(enum msm_pm_time_stats_id *enable_stats,
 		int size) {}
 static inline void msm_pm_add_stat(enum msm_pm_time_stats_id id, int64_t t) {}
 #endif
+
+void msm_pm_set_cpr_ops(struct msm_pm_cpr_ops *ops);
 
 #endif  /* __ARCH_ARM_MACH_MSM_PM_H */

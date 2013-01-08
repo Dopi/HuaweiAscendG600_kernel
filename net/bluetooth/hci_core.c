@@ -61,7 +61,7 @@ static void hci_tx_task(unsigned long arg);
 
 static DEFINE_RWLOCK(hci_task_lock);
 
-static int enable_smp = 1;
+static bool enable_smp = 1;
 
 /* HCI device list */
 LIST_HEAD(hci_dev_list);
@@ -2214,6 +2214,7 @@ static inline void hci_sched_acl(struct hci_dev *hdev)
 			if (count > hdev->acl_cnt)
 				return;
 
+			hci_dev_lock(hdev);
 			hci_conn_enter_active_mode(conn, bt_cb(skb)->force_active);
 
 			hci_send_frame(skb);
@@ -2223,6 +2224,7 @@ static inline void hci_sched_acl(struct hci_dev *hdev)
 			quote -= count;
 
 			conn->sent += count;
+			hci_dev_unlock(hdev);
 		}
 	}
 }

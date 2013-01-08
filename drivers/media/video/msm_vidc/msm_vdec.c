@@ -202,6 +202,14 @@ static const struct msm_vidc_format vdec_formats[] = {
 		.type = OUTPUT_PORT,
 	},
 	{
+		.name = "VC1",
+		.description = "VC-1 compressed format",
+		.fourcc = V4L2_PIX_FMT_VC1_ANNEX_G,
+		.num_planes = 1,
+		.get_frame_size = get_frame_size_compressed,
+		.type = OUTPUT_PORT,
+	},
+	{
 		.name = "H264",
 		.description = "H264 compressed format",
 		.fourcc = V4L2_PIX_FMT_H264,
@@ -221,6 +229,14 @@ static const struct msm_vidc_format vdec_formats[] = {
 		.name = "DIVX 311",
 		.description = "DIVX 311 compressed format",
 		.fourcc = V4L2_PIX_FMT_DIVX_311,
+		.num_planes = 1,
+		.get_frame_size = get_frame_size_compressed,
+		.type = OUTPUT_PORT,
+	},
+	{
+		.name = "DIVX",
+		.description = "DIVX 4/5/6 compressed format",
+		.fourcc = V4L2_PIX_FMT_DIVX,
 		.num_planes = 1,
 		.get_frame_size = get_frame_size_compressed,
 		.type = OUTPUT_PORT,
@@ -515,9 +531,11 @@ int msm_vdec_enum_fmt(struct msm_vidc_inst *inst, struct v4l2_fmtdesc *f)
 	return rc;
 }
 
-static int msm_vdec_queue_setup(struct vb2_queue *q, unsigned int *num_buffers,
-			unsigned int *num_planes, unsigned long sizes[],
-			void *alloc_ctxs[])
+static int msm_vdec_queue_setup(struct vb2_queue *q,
+				const struct v4l2_format *fmt,
+				unsigned int *num_buffers,
+				unsigned int *num_planes, unsigned int sizes[],
+				void *alloc_ctxs[])
 {
 	int i, rc = 0;
 	struct msm_vidc_inst *inst;
@@ -700,7 +718,7 @@ fail_start:
 	return rc;
 }
 
-static int msm_vdec_start_streaming(struct vb2_queue *q)
+static int msm_vdec_start_streaming(struct vb2_queue *q, unsigned int count)
 {
 	struct msm_vidc_inst *inst;
 	int rc = 0;
@@ -814,7 +832,7 @@ const struct v4l2_ctrl_ops *msm_vdec_get_ctrl_ops(void)
 
 int msm_vdec_s_ctrl(struct msm_vidc_inst *inst, struct v4l2_control *ctrl)
 {
-	return v4l2_s_ctrl(&inst->ctrl_handler, ctrl);
+	return v4l2_s_ctrl(NULL, &inst->ctrl_handler, ctrl);
 }
 int msm_vdec_g_ctrl(struct msm_vidc_inst *inst, struct v4l2_control *ctrl)
 {

@@ -36,17 +36,21 @@
 #include <linux/android_pmem.h>
 #include <mach/msm_iomap.h>
 #include <mach/socinfo.h>
+#include <linux/sched.h>
+
+/* fixme */
+#include <asm/tlbflush.h>
 #include <../../mm/mm.h>
 #include <linux/fmem.h>
 
-void *strongly_ordered_page;
-char strongly_ordered_mem[PAGE_SIZE*2-4];
+#if defined(CONFIG_ARCH_MSM7X27)
+static void *strongly_ordered_page;
+static char strongly_ordered_mem[PAGE_SIZE*2-4];
 
-void map_page_strongly_ordered(void)
+void __init map_page_strongly_ordered(void)
 {
-#if defined(CONFIG_ARCH_MSM7X27) && !defined(CONFIG_ARCH_MSM7X27A)
 	long unsigned int phys;
-	struct map_desc map;
+	struct map_desc map[1];
 
 	if (strongly_ordered_page)
 		return;
@@ -54,33 +58,26 @@ void map_page_strongly_ordered(void)
 	strongly_ordered_page = (void*)PFN_ALIGN((int)&strongly_ordered_mem);
 	phys = __pa(strongly_ordered_page);
 
-	map.pfn = __phys_to_pfn(phys);
-	map.virtual = MSM_STRONGLY_ORDERED_PAGE;
-	map.length = PAGE_SIZE;
-	map.type = MT_DEVICE_STRONGLY_ORDERED;
-	create_mapping(&map);
+	map[0].pfn = __phys_to_pfn(phys);
+	map[0].virtual = MSM_STRONGLY_ORDERED_PAGE;
+	map[0].length = PAGE_SIZE;
+	map[0].type = MT_MEMORY_SO;
+	iotable_init(map, ARRAY_SIZE(map));
 
 	printk(KERN_ALERT "Initialized strongly ordered page successfully\n");
-#endif
 }
-EXPORT_SYMBOL(map_page_strongly_ordered);
+#else
+void map_page_strongly_ordered(void) { }
+#endif
 
+#if defined(CONFIG_ARCH_MSM7X27)
 void write_to_strongly_ordered_memory(void)
 {
-#if defined(CONFIG_ARCH_MSM7X27) && !defined(CONFIG_ARCH_MSM7X27A)
-	if (!strongly_ordered_page) {
-		if (!in_interrupt())
-			map_page_strongly_ordered();
-		else {
-			printk(KERN_ALERT "Cannot map strongly ordered page in "
-				"Interrupt Context\n");
-			/* capture it here before the allocation fails later */
-			BUG();
-		}
-	}
 	*(int *)MSM_STRONGLY_ORDERED_PAGE = 0;
-#endif
 }
+#else
+void write_to_strongly_ordered_memory(void) { }
+#endif
 EXPORT_SYMBOL(write_to_strongly_ordered_memory);
 
 /* These cache related routines make the assumption (if outer cache is
@@ -307,8 +304,7 @@ static void __init reserve_memory_for_mempools(void)
 				 * out of multiple contiguous memory banks.
 				 */
 				mt->start = mb->start + (size - mt->size);
-
-#ifdef CONFIG_SRECORDER_MSM
+#ifdef CONFIG_SRECORDER_MSM                
                 s_mempools_pstart_addr = mt->start;
 #endif /* CONFIG_SRECORDER_MSM */
 
@@ -385,64 +381,6 @@ unsigned long allocate_contiguous_ebi_nomap(unsigned long size,
 }
 EXPORT_SYMBOL(allocate_contiguous_ebi_nomap);
 
-/* emulation of the deprecated pmem_kalloc and pmem_kfree */
-int32_t pmem_kalloc(const size_t size, const uint32_t flags)
-{
-	int pmem_memtype;
-	int memtype = MEMTYPE_NONE;
-	int ebi1_memtype = MEMTYPE_EBI1;
-	unsigned int align;
-	int32_t paddr;
-
-	switch (flags & PMEM_ALIGNMENT_MASK) {
-	case PMEM_ALIGNMENT_4K:
-		align = SZ_4K;
-		break;
-	case PMEM_ALIGNMENT_1M:
-		align = SZ_1M;
-		break;
-	default:
-		pr_alert("Invalid alignment %x\n",
-			(flags & PMEM_ALIGNMENT_MASK));
-		return -EINVAL;
-	}
-
-	/* on 7x30 and 8x55 "EBI1 kernel PMEM" is really on EBI0 */
-	if (cpu_is_msm7x30() || cpu_is_msm8x55())
-			ebi1_memtype = MEMTYPE_EBI0;
-
-	pmem_memtype = flags & PMEM_MEMTYPE_MASK;
-	if (pmem_memtype == PMEM_MEMTYPE_EBI1)
-		memtype = ebi1_memtype;
-	else if (pmem_memtype == PMEM_MEMTYPE_SMI)
-		memtype = MEMTYPE_SMI_KERNEL;
-	else {
-		pr_alert("Invalid memory type %x\n",
-			flags & PMEM_MEMTYPE_MASK);
-		return -EINVAL;
-	}
-
-	paddr = _allocate_contiguous_memory_nomap(size, memtype, align,
-		__builtin_return_address(0));
-
-	if (!paddr && pmem_memtype == PMEM_MEMTYPE_SMI)
-		paddr = _allocate_contiguous_memory_nomap(size,
-			ebi1_memtype, align, __builtin_return_address(0));
-
-	if (!paddr)
-		return -ENOMEM;
-	return paddr;
-}
-EXPORT_SYMBOL(pmem_kalloc);
-
-int pmem_kfree(const int32_t physaddr)
-{
-	free_contiguous_memory_by_paddr(physaddr);
-
-	return 0;
-}
-EXPORT_SYMBOL(pmem_kfree);
-
 unsigned int msm_ttbr0;
 
 void store_ttbr0(void)
@@ -460,4 +398,15 @@ int request_fmem_c_region(void *unused)
 int release_fmem_c_region(void *unused)
 {
 	return fmem_set_state(FMEM_T_STATE);
+}
+
+unsigned long get_ddr_size(void)
+{
+	unsigned int i;
+	unsigned long ret = 0;
+
+	for (i = 0; i < meminfo.nr_banks; i++)
+		ret += meminfo.bank[i].size;
+
+	return ret;
 }

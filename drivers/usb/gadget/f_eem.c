@@ -9,15 +9,6 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include <linux/kernel.h>
@@ -112,6 +103,45 @@ static struct usb_descriptor_header *eem_hs_function[] __initdata = {
 	(struct usb_descriptor_header *) &eem_intf,
 	(struct usb_descriptor_header *) &eem_hs_in_desc,
 	(struct usb_descriptor_header *) &eem_hs_out_desc,
+	NULL,
+};
+
+/* super speed support: */
+
+static struct usb_endpoint_descriptor eem_ss_in_desc __initdata = {
+	.bLength =		USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType =	USB_DT_ENDPOINT,
+
+	.bEndpointAddress =	USB_DIR_IN,
+	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
+	.wMaxPacketSize =	cpu_to_le16(1024),
+};
+
+static struct usb_endpoint_descriptor eem_ss_out_desc __initdata = {
+	.bLength =		USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType =	USB_DT_ENDPOINT,
+
+	.bEndpointAddress =	USB_DIR_OUT,
+	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
+	.wMaxPacketSize =	cpu_to_le16(1024),
+};
+
+static struct usb_ss_ep_comp_descriptor eem_ss_bulk_comp_desc __initdata = {
+	.bLength =		sizeof eem_ss_bulk_comp_desc,
+	.bDescriptorType =	USB_DT_SS_ENDPOINT_COMP,
+
+	/* the following 2 values can be tweaked if necessary */
+	/* .bMaxBurst =		0, */
+	/* .bmAttributes =	0, */
+};
+
+static struct usb_descriptor_header *eem_ss_function[] __initdata = {
+	/* CDC EEM control descriptors */
+	(struct usb_descriptor_header *) &eem_intf,
+	(struct usb_descriptor_header *) &eem_ss_in_desc,
+	(struct usb_descriptor_header *) &eem_ss_bulk_comp_desc,
+	(struct usb_descriptor_header *) &eem_ss_out_desc,
+	(struct usb_descriptor_header *) &eem_ss_bulk_comp_desc,
 	NULL,
 };
 
@@ -265,7 +295,20 @@ eem_bind(struct usb_configuration *c, struct usb_function *f)
 			goto fail;
 	}
 
+	if (gadget_is_superspeed(c->cdev->gadget)) {
+		eem_ss_in_desc.bEndpointAddress =
+				eem_fs_in_desc.bEndpointAddress;
+		eem_ss_out_desc.bEndpointAddress =
+				eem_fs_out_desc.bEndpointAddress;
+
+		/* copy descriptors, and track endpoint copies */
+		f->ss_descriptors = usb_copy_descriptors(eem_ss_function);
+		if (!f->ss_descriptors)
+			goto fail;
+	}
+
 	DBG(cdev, "CDC Ethernet (EEM): %s speed IN/%s OUT/%s\n",
+			gadget_is_superspeed(c->cdev->gadget) ? "super" :
 			gadget_is_dualspeed(c->cdev->gadget) ? "dual" : "full",
 			eem->port.in_ep->name, eem->port.out_ep->name);
 	return 0;
@@ -273,6 +316,8 @@ eem_bind(struct usb_configuration *c, struct usb_function *f)
 fail:
 	if (f->descriptors)
 		usb_free_descriptors(f->descriptors);
+	if (f->hs_descriptors)
+		usb_free_descriptors(f->hs_descriptors);
 
 	/* we might as well release our claims on endpoints */
 	if (eem->port.out_ep->desc)
@@ -292,6 +337,8 @@ eem_unbind(struct usb_configuration *c, struct usb_function *f)
 
 	DBG(c->cdev, "eem unbind\n");
 
+	if (gadget_is_superspeed(c->cdev->gadget))
+		usb_free_descriptors(f->ss_descriptors);
 	if (gadget_is_dualspeed(c->cdev->gadget))
 		usb_free_descriptors(f->hs_descriptors);
 	usb_free_descriptors(f->descriptors);

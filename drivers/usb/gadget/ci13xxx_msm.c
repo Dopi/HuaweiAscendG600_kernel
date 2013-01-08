@@ -16,7 +16,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/usb/msm_hsusb_hw.h>
 #include <linux/usb/ulpi.h>
-#include <mach/gpio.h>
+#include <linux/gpio.h>
 
 #include "ci13xxx_udc.c"
 
@@ -56,7 +56,7 @@ static void ci13xxx_msm_resume(void)
 
 	if (_udc_ctxt.wake_irq && _udc_ctxt.wake_irq_state) {
 		disable_irq_wake(_udc_ctxt.wake_irq);
-		disable_irq(_udc_ctxt.wake_irq);
+		disable_irq_nosync(_udc_ctxt.wake_irq);
 		_udc_ctxt.wake_irq_state = false;
 	}
 }
@@ -95,7 +95,7 @@ static irqreturn_t ci13xxx_msm_resume_irq(int irq, void *data)
 	struct ci13xxx *udc = _udc;
 
 	if (udc->transceiver && udc->vbus_active && udc->suspended)
-		otg_set_suspend(udc->transceiver, 0);
+		usb_phy_set_suspend(udc->transceiver, 0);
 	else if (!udc->suspended)
 		ci13xxx_msm_resume();
 
@@ -125,7 +125,7 @@ static int ci13xxx_msm_install_wake_gpio(struct platform_device *pdev,
 	_udc_ctxt.wake_gpio = res->start;
 	gpio_request(_udc_ctxt.wake_gpio, "USB_RESUME");
 	gpio_direction_input(_udc_ctxt.wake_gpio);
-	wake_irq = MSM_GPIO_TO_INT(_udc_ctxt.wake_gpio);
+	wake_irq = gpio_to_irq(_udc_ctxt.wake_gpio);
 	if (wake_irq < 0) {
 		dev_err(&pdev->dev, "could not register USB_RESUME GPIO.\n");
 		return -ENXIO;
@@ -134,7 +134,7 @@ static int ci13xxx_msm_install_wake_gpio(struct platform_device *pdev,
 	dev_dbg(&pdev->dev, "_udc_ctxt.gpio_irq = %d and irq = %d\n",
 			_udc_ctxt.wake_gpio, wake_irq);
 	ret = request_irq(wake_irq, ci13xxx_msm_resume_irq,
-		IRQF_TRIGGER_HIGH | IRQF_ONESHOT, "usb resume", NULL);
+		IRQF_TRIGGER_RISING | IRQF_ONESHOT, "usb resume", NULL);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "could not register USB_RESUME IRQ.\n");
 		goto gpio_free;
@@ -238,6 +238,7 @@ static struct platform_driver ci13xxx_msm_driver = {
 	.driver = { .name = "msm_hsusb", },
 	.remove = ci13xxx_msm_remove,
 };
+MODULE_ALIAS("platform:msm_hsusb");
 
 static int __init ci13xxx_msm_init(void)
 {

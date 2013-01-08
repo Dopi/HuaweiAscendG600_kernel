@@ -25,7 +25,6 @@
 #include <mach/board.h>
 
 #include "devices.h"
-#include "gpio_hw.h"
 
 #include <asm/mach/flash.h>
 
@@ -34,6 +33,11 @@
 #include <mach/usbdiag.h>
 #include <mach/rpc_hsusb.h>
 #include "pm.h"
+
+struct platform_device msm8x50_device_acpuclk = {
+	.name		= "acpuclk-8x50",
+	.id		= -1,
+};
 
 static struct resource resources_uart1[] = {
 	{

@@ -9,17 +9,12 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301, USA.
- *
  */
 
 
 #include "mt9e013.h"
 
-struct mt9e013_i2c_reg_conf mipi_settings[] = {
+static struct mt9e013_i2c_reg_conf mipi_settings[] = {
 	/*Disable embedded data*/
 	{0x3064, 0x7800},/*SMIA_TEST*/
 	/*configure 2-lane MIPI*/
@@ -32,7 +27,7 @@ struct mt9e013_i2c_reg_conf mipi_settings[] = {
 
 /*PLL Configuration
 (Ext=24MHz, vt_pix_clk=174MHz, op_pix_clk=69.6MHz)*/
-struct mt9e013_i2c_reg_conf pll_settings[] = {
+static struct mt9e013_i2c_reg_conf pll_settings[] = {
 	{0x0300, 0x0004},/*VT_PIX_CLK_DIV*/
 	{0x0302, 0x0001},/*VT_SYS_CLK_DIV*/
 	{0x0304, 0x0002},/*PRE_PLL_CLK_DIV*/
@@ -41,7 +36,7 @@ struct mt9e013_i2c_reg_conf pll_settings[] = {
 	{0x030A, 0x0001},/*OP_SYS_CLK_DIV*/
 };
 
-struct mt9e013_i2c_reg_conf prev_settings[] = {
+static struct mt9e013_i2c_reg_conf prev_settings[] = {
 /*Output Size (1632x1224)(1640*1230)*/
          {0x0344, 0x0000},/*X_ADDR_START*/
          {0x0348, 0x0CD1},/*X_ADDR_END*/
@@ -61,10 +56,9 @@ struct mt9e013_i2c_reg_conf prev_settings[] = {
          {0x0202, 0x055F},/*COARSE_INTEGRATION_TIME*/
          {0x3014, 0x0846},/*FINE_INTEGRATION_TIME_*/
          {0x3010, 0x0130},/*FINE_CORRECTION*/
-
 };
 
-struct mt9e013_i2c_reg_conf snap_settings[] = {
+static struct mt9e013_i2c_reg_conf snap_settings[] = {
          /*Output Size (3280x2464)*/
          {0x0344, 0x0000},/*X_ADDR_START */
          {0x0348, 0x0CCF},/*X_ADDR_END*/
@@ -84,11 +78,69 @@ struct mt9e013_i2c_reg_conf snap_settings[] = {
          {0x0202, 0x0A2F},/*COARSE_INTEGRATION_TIME*/
          {0x3014, 0x0D26},/*FINE_INTEGRATION_TIME_ */
          {0x3010, 0x0078},/*FINE_CORRECTION*/
+
+static struct mt9e013_i2c_reg_conf pll_settings_60fps[] = {
+	{0x0300, 0x0004},/*VT_PIX_CLK_DIV*/
+	{0x0302, 0x0001},/*VT_SYS_CLK_DIV*/
+	{0x0304, 0x0002},/*PRE_PLL_CLK_DIV*/
+	{0x0306, 0x0042},/*PLL_MULTIPLIER*/
+	{0x0308, 0x000A},/*OP_PIX_CLK_DIV*/
+	{0x030A, 0x0001},/*OP_SYS_CLK_DIV*/
 };
 
+static struct mt9e013_i2c_reg_conf prev_settings_60fps[] = {
+	/*Output Size (1632x1224)*/
+	{0x0344, 0x0008},/*X_ADDR_START*/
+	{0x0348, 0x0CC5},/*X_ADDR_END*/
+	{0x0346, 0x013a},/*Y_ADDR_START*/
+	{0x034A, 0x0863},/*Y_ADDR_END*/
+	{0x034C, 0x0660},/*X_OUTPUT_SIZE*/
+	{0x034E, 0x0396},/*Y_OUTPUT_SIZE*/
+	{0x306E, 0xFC80},/*DATAPATH_SELECT*/
+	{0x3040, 0x00C3},/*READ_MODE*/
+	{0x3178, 0x0000},/*ANALOG_CONTROL5*/
+	{0x3ED0, 0x1E24},/*DAC_LD_4_5*/
+	{0x0400, 0x0000},/*SCALING_MODE*/
+	{0x0404, 0x0010},/*SCALE_M*/
+	/*Timing configuration*/
+	{0x0342, 0x0BE8},/*LINE_LENGTH_PCK*/
+	{0x0340, 0x0425},/*FRAME_LENGTH_LINES*/
+	{0x0202, 0x0425},/*COARSE_INTEGRATION_TIME*/
+	{0x3014, 0x03F6},/*FINE_INTEGRATION_TIME_*/
+	{0x3010, 0x0078},/*FINE_CORRECTION*/
+};
 
+static struct mt9e013_i2c_reg_conf pll_settings_120fps[] = {
+	{0x0300, 0x0005},/*VT_PIX_CLK_DIV*/
+	{0x0302, 0x0001},/*VT_SYS_CLK_DIV*/
+	{0x0304, 0x0002},/*PRE_PLL_CLK_DIV*/
+	{0x0306, 0x0052},/*PLL_MULTIPLIER*/
+	{0x0308, 0x000A},/*OP_PIX_CLK_DIV*/
+	{0x030A, 0x0001},/*OP_SYS_CLK_DIV*/
+};
 
-struct mt9e013_i2c_reg_conf recommend_settings[] = {
+static struct mt9e013_i2c_reg_conf prev_settings_120fps[] = {
+	{0x0344, 0x0008},/*X_ADDR_START*/
+	{0x0348, 0x0685},/*X_ADDR_END*/
+	{0x0346, 0x013a},/*Y_ADDR_START*/
+	{0x034A, 0x055B},/*Y_ADDR_END*/
+	{0x034C, 0x0340},/*X_OUTPUT_SIZE*/
+	{0x034E, 0x0212},/*Y_OUTPUT_SIZE*/
+	{0x306E, 0xFC80},/*DATAPATH_SELECT*/
+	{0x3040, 0x00C3},/*READ_MODE*/
+	{0x3178, 0x0000},/*ANALOG_CONTROL5*/
+	{0x3ED0, 0x1E24},/*DAC_LD_4_5*/
+	{0x0400, 0x0000},/*SCALING_MODE*/
+	{0x0404, 0x0010},/*SCALE_M*/
+	/*Timing configuration*/
+	{0x0342, 0x0970},/*LINE_LENGTH_PCK*/
+	{0x0340, 0x02A1},/*FRAME_LENGTH_LINES*/
+	{0x0202, 0x02A1},/*COARSE_INTEGRATION_TIME*/
+	{0x3014, 0x03F6},/*FINE_INTEGRATION_TIME_*/
+	{0x3010, 0x0078},/*FINE_CORRECTION*/
+};
+
+static struct mt9e013_i2c_reg_conf recommend_settings[] = {
 	{0x3044, 0x0590},
 	{0x306E, 0xFC80},
 	{0x30B2, 0xC000},
@@ -400,7 +452,6 @@ struct mt9e013_i2c_reg_conf shading_settings[] =
 {0x37C6, 0x822B}
 };
 //lijuan add for OTP reading
-
 struct mt9e013_reg mt9e013_regs = {
 	.reg_mipi = &mipi_settings[0],
 	.reg_mipi_size = ARRAY_SIZE(mipi_settings),
@@ -409,10 +460,18 @@ struct mt9e013_reg mt9e013_regs = {
 	.reg_pll = &pll_settings[0],
 	.reg_pll_size = ARRAY_SIZE(pll_settings),
 	.reg_prev = &prev_settings[0],
+	.reg_pll_60fps = &pll_settings_60fps[0],
+	.reg_pll_60fps_size = ARRAY_SIZE(pll_settings_60fps),
+	.reg_pll_120fps = &pll_settings_120fps[0],
+	.reg_pll_120fps_size = ARRAY_SIZE(pll_settings_120fps),
 	.reg_prev_size = ARRAY_SIZE(prev_settings),
 	.reg_snap = &snap_settings[0],
 	.reg_snap_size = ARRAY_SIZE(snap_settings),
-	.reg_shading = &shading_settings[0],
+	.reg_60fps = &prev_settings_60fps[0],
+	.reg_60fps_size = ARRAY_SIZE(prev_settings_60fps),
+	.reg_120fps = &prev_settings_120fps[0],
+	.reg_120fps_size = ARRAY_SIZE(prev_settings_120fps),
+    .reg_shading = &shading_settings[0],
 	.reg_shading_size = ARRAY_SIZE(shading_settings),
 	.reg_otp = &OTP_settings[0],
 	.reg_otp_size = ARRAY_SIZE(OTP_settings),

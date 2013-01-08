@@ -17,9 +17,10 @@
 #ifdef __KERNEL__
 
 /* Header files */
+#include <linux/module.h>
 #include <linux/i2c.h>
 #include <linux/videodev2.h>
-#include <linux/pm_qos_params.h>
+#include <linux/pm_qos.h>
 #include <media/v4l2-dev.h>
 #include <media/v4l2-ioctl.h>
 #include <media/v4l2-device.h>
@@ -138,13 +139,11 @@ struct isp_msg_output {
 
 /* message id for v4l2_subdev_notify*/
 enum msm_camera_v4l2_subdev_notify {
-	NOTIFY_CID_CHANGE, /* arg = msm_camera_csid_params */
 	NOTIFY_ISP_MSG_EVT, /* arg = enum ISP_MESSAGE_ID */
 	NOTIFY_VFE_MSG_OUT, /* arg = struct isp_msg_output */
 	NOTIFY_VFE_MSG_STATS,  /* arg = struct isp_msg_stats */
 	NOTIFY_VFE_MSG_COMP_STATS, /* arg = struct msm_stats_buf */
 	NOTIFY_VFE_BUF_EVT, /* arg = struct msm_vfe_resp */
-	NOTIFY_ISPIF_STREAM, /* arg = enable parameter for s_stream */
 	NOTIFY_VPE_MSG_EVT,
 	NOTIFY_PCLK_CHANGE, /* arg = pclk */
 	NOTIFY_CSIPHY_CFG, /* arg = msm_camera_csiphy_params */
@@ -169,7 +168,7 @@ enum isp_vfe_cmd_id {
 
 struct msm_cam_v4l2_device;
 struct msm_cam_v4l2_dev_inst;
-#define MSM_MAX_IMG_MODE                8
+#define MSM_MAX_IMG_MODE                MSM_V4L2_EXT_CAPTURE_MODE_MAX
 
 enum msm_buffer_state {
 	MSM_BUFFER_STATE_UNUSED,
@@ -259,8 +258,8 @@ struct msm_cam_media_controller {
 	uint8_t opencnt; /*mctl ref count*/
 	const char *apps_id; /*ID for app that open this session*/
 	struct mutex lock;
-	struct wake_lock wake_lock; /*avoid low power mode when active*/
-	struct pm_qos_request_list pm_qos_req_list;
+	struct pm_qos_request idle_pm_qos; /*avoid low power mode when active*/
+	struct pm_qos_request pm_qos_req_list;
 	struct msm_mctl_pp_info pp_info;
 	struct msm_mctl_stats_t stats_info; /*stats pmem info*/
 	uint32_t vfe_output_mode; /* VFE output mode */
@@ -333,7 +332,7 @@ struct msm_cam_v4l2_dev_inst {
 	int is_mem_map_inst;
 	struct img_plane_info plane_info;
 	int vbqueue_initialized;
-    struct mutex inst_lock;
+	struct mutex inst_lock;
 };
 
 struct msm_cam_mctl_node {

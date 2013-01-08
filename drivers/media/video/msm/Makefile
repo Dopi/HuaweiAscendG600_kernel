@@ -61,10 +61,8 @@ obj-$(CONFIG_MT9P012) += mt9p012_reg.o
 obj-$(CONFIG_MSM_CAMERA_AF_FOXCONN) += mt9p012_fox.o
 obj-$(CONFIG_MSM_CAMERA_AF_BAM) += mt9p012_bam.o
 obj-$(CONFIG_MT9P012_KM) += mt9p012_km.o mt9p012_km_reg.o
-#/*deletes some lines*/
 obj-$(CONFIG_S5K3E2FX) += s5k3e2fx.o
 #obj-$(CONFIG_HUAWEI_SENSOR_S5K4E1) += s5k4e1.o s5k4e1_reg.o
-obj-$(CONFIG_S5K3E2FX) += s5k3e2fx.o
 #FIXME: Merge the two ifeq causes VX6953 preview not coming up.
 ifneq ($(CONFIG_MSM_CAMERA_V4L2),y)
   obj-$(CONFIG_VX6953) += vx6953.o vx6953_reg.o
@@ -84,6 +82,6 @@ obj-$(CONFIG_MT9D112) += mt9d112.o mt9d112_reg.o
 
 obj-$(CONFIG_HUAWEI_CAMERA_SENSOR_MT9D113) += mt9d113.o mt9d113_reg.o
 obj-$(CONFIG_FB_MSM_WRITEBACK_MSM_PANEL) += wfd/
+obj-$(CONFIG_MSM_V4L2_VIDEO_OVERLAY_DEVICE) += msm_v4l2_video.o
 #obj-$(CONFIG_HUAWEI_CAMERA_SENSOR_MT9V113) += mt9v113.o 
 
-obj-$(CONFIG_MSM_V4L2_VIDEO_OVERLAY_DEVICE) += msm_v4l2_video.o

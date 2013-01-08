@@ -26,9 +26,8 @@
 #include <mach/dma.h>
 #include <mach/board.h>
 #include <asm/clkdev.h>
-
+#include <linux/ion.h>
 #include "devices.h"
-#include "gpio_hw.h"
 #include "footswitch.h"
 
 #include <asm/mach/flash.h>
@@ -42,6 +41,11 @@
 #include <mach/msm_memtypes.h>
 #include "pm.h"
 #include "irq.h"
+
+struct platform_device msm7x30_device_acpuclk = {
+	.name		= "acpuclk-7x30",
+	.id		= -1,
+};
 
 /* EBI THERMAL DRIVER */
 static struct resource msm_ebi0_thermal_resources[] = {
@@ -656,9 +660,7 @@ struct platform_device msm_device_otg = {
 };
 
 struct flash_platform_data msm_nand_data = {
-	.parts		= NULL,
-	.nr_parts	= 0,
-	.interleave     = 0,
+	.version = VERSION_2,
 };
 
 struct platform_device msm_device_nand = {
@@ -818,8 +820,8 @@ static struct resource resources_sdc2[] = {
 	},
 	{
 		.name	= "sdcc_dma_chnl",
-		.start	= DMOV_SDC2_CHAN,
-		.end	= DMOV_SDC2_CHAN,
+		.start	= DMOV_NAND_CHAN,
+		.end	= DMOV_NAND_CHAN,
 		.flags	= IORESOURCE_DMA,
 	},
 	{
@@ -1006,8 +1008,8 @@ static struct resource msm_vidc_720p_resources[] = {
 };
 
 struct msm_vidc_platform_data vidc_platform_data = {
-	.memtype = MEMTYPE_EBI0,
-	.enable_ion = 0,
+	.memtype = ION_CAMERA_HEAP_ID,
+	.enable_ion = 1,
 	.disable_dmx = 0,
 	.cont_mode_dpb_count = 8
 };

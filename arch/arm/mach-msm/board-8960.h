@@ -13,7 +13,7 @@
 #ifndef __ARCH_ARM_MACH_MSM_BOARD_MSM8960_H
 #define __ARCH_ARM_MACH_MSM_BOARD_MSM8960_H
 
-#include <linux/regulator/gpio-regulator.h>
+#include <linux/regulator/msm-gpio-regulator.h>
 #include <linux/mfd/pm8xxx/pm8921.h>
 #include <linux/i2c.h>
 #include <linux/i2c/sx150x.h>

@@ -52,7 +52,7 @@ struct msm_rpm_driver_data {
 #define ERR "err\0"
 #define MAX_ERR_BUFFER_SIZE 60
 
-static struct atomic_notifier_head msm_rpm_sleep_notifier;
+static ATOMIC_NOTIFIER_HEAD(msm_rpm_sleep_notifier);
 static bool standalone;
 
 int msm_rpm_register_notifier(struct notifier_block *nb)
@@ -736,7 +736,7 @@ bail:
 EXPORT_SYMBOL(msm_rpm_send_message_noirq);
 static bool msm_rpm_set_standalone(void)
 {
-	if (machine_is_copper()) {
+	if (machine_is_msm8974()) {
 		pr_warn("%s(): Running in standalone mode, requests "
 				"will not be sent to RPM\n", __func__);
 		standalone = true;

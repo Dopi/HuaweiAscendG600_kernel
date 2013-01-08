@@ -326,7 +326,7 @@ static void __pmic8xxx_kp_scan_matrix(struct pmic8xxx_kp *kp, u16 *new_state,
 	       		mmi_keystate[kp->keycodes[code]] = (!(new_state[row]&(1<<col)))? MMI_KEY_DOWN :MMI_KEY_UP ;
 				input_sync(kp->input);
 #ifdef CONFIG_HUAWEI_KERNEL		
-            }
+             }
 #endif	
 		}
 	}
@@ -848,18 +848,7 @@ static struct platform_driver pmic8xxx_kp_driver = {
 		.pm = &pm8xxx_kp_pm_ops,
 	},
 };
-
-static int __init pmic8xxx_kp_init(void)
-{
-	return platform_driver_register(&pmic8xxx_kp_driver);
-}
-module_init(pmic8xxx_kp_init);
-
-static void __exit pmic8xxx_kp_exit(void)
-{
-	platform_driver_unregister(&pmic8xxx_kp_driver);
-}
-module_exit(pmic8xxx_kp_exit);
+module_platform_driver(pmic8xxx_kp_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("PMIC8XXX keypad driver");

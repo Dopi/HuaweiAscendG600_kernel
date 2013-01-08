@@ -94,6 +94,9 @@ typedef enum
    LCD_PANEL_ALIGN_INVALID = 0xFF
 }lcd_align_type;
 
+/* modify name:
+ * named rules: interface[_sub interface]_IC_Module_solution
+ */
 typedef enum
 {
 	LCD_S6D74A0_SAMSUNG_HVGA,
@@ -122,27 +125,36 @@ typedef enum
 	LCD_HX8347D_CHIMEI_QVGA,
 	LCD_HX8347G_TIANMA_QVGA,
 	LCD_HX8357C_TIANMA_HVGA,
-	MIPI_NT35560_TOSHIBA_FWVGA,
-	MIPI_RSP61408_CHIMEI_WVGA,
-	MIPI_RSP61408_BYD_WVGA,
-	MIPI_HX8357C_CHIMEI_HVGA,
-	MIPI_HX8357C_TIANMA_HVGA,
-	MIPI_HX8369A_TIANMA_WVGA,
-	MIPI_HX8357C_CHIMEI_IPS_HVGA,
+	MIPI_CMD_NT35560_TOSHIBA_FWVGA,
+	MIPI_CMD_RSP61408_CHIMEI_WVGA,
+	MIPI_CMD_RSP61408_BYD_WVGA,
+	MIPI_CMD_HX8357C_CHIMEI_HVGA,
+	MIPI_CMD_HX8357C_TIANMA_HVGA,
+	MIPI_CMD_HX8369A_TIANMA_WVGA,
+	MIPI_VIDEO_HX8369B_TIANMA_WVGA,
+	MIPI_CMD_HX8357C_CHIMEI_IPS_HVGA,
 	MDDI_HX8357C_TIANMA_HVGA,
 	MDDI_HX8357C_CHIMEI_HVGA,
 	MDDI_HX8357C_CHIMEI_IPS_HVGA,
-	MIPI_HX8357C_TIANMA_IPS_HVGA,
-	MIPI_RSP61408_TRULY_WVGA, 
-	MIPI_NT35516_TIANMA_QHD,
-	MIPI_NT35516_CHIMEI_QHD,
-	MIPI_NT35510_BOE_WVGA,
-	MIPI_HX8369A_TIANMA_FWVGA,
-	MIPI_OTM8009A_CHIMEI_WVGA,
-	MIPI_NT35510_BOE_FWVGA,
-	MIPI_NT35310_TIANMA_HVGA,
-	MIPI_NT35310_BYD_HVGA,
-	MIPI_NT35310_BOE_HVGA,
+	MIPI_CMD_HX8357C_TIANMA_IPS_HVGA,
+	MIPI_CMD_RSP61408_TRULY_WVGA, 
+	MIPI_CMD_NT35516_TIANMA_QHD,
+	MIPI_CMD_NT35516_CHIMEI_QHD,
+	MIPI_CMD_NT35510_BOE_WVGA,
+	MIPI_CMD_HX8369A_TIANMA_FWVGA,
+	MIPI_CMD_OTM8009A_CHIMEI_WVGA,
+	/*Add otm8018b for video mode*/
+	MIPI_VIDEO_OTM8018B_CHIMEI_WVGA,
+	/*Add nt35512 for video mode*/
+	MIPI_VIDEO_NT35512_BOE_WVGA,
+	/*Add nt35512 video mode for byd*/
+	MIPI_VIDEO_NT35512_BYD_WVGA,
+	MIPI_CMD_NT35510_BOE_FWVGA,
+	MIPI_CMD_NT35310_TIANMA_HVGA,
+	MIPI_CMD_NT35310_BYD_HVGA,
+	MIPI_CMD_NT35310_BOE_HVGA,
+	MIPI_CMD_OTM8009A_CHIMEI_FWVGA,
+	MIPI_CMD_NT35510_CHIMEI_WVGA,
 	LCD_MAX_NUM,
 	LCD_NONE =0xFF
 }lcd_panel_type;
@@ -222,14 +234,14 @@ typedef enum
 
 typedef enum
 {
-    MAN_UPDATE_FW = 0x0,
-    AUTO_UPDATE_FW = 0x1,
+    NOT_NEED_UPDATE_FW = 0x0,
+    NEED_UPDATE_FW = 0x1,
     UPDATE_MAX = 0xF,
 }tp_update_type;
 
 tp_type get_touch_type(void);
 
-tp_update_type is_auto_update_fw(void);
+tp_update_type is_need_update_fw(void);
 
 
 typedef enum
@@ -304,13 +316,16 @@ typedef enum
     FM_QUALCOMM = 0x200,
     MONO_SPEAKER   = 0x1000,
     STEREO_SPEAKER = 0x2000,
-    SECONDMIC_NONE = 0x10000,
-    SECONDMIC_EXIST = 0x20000,
+    SPK_MAIN_MIC = 0x10000,
+    SPK_SUB_MIC = 0x20000,
+    DTS_ENABLE = 0x100000,
+    DTS_DISABLE = 0x0,
     
-    AUDIO_TYPE_MAX = 0xffff
+    AUDIO_TYPE_MAX = 0xffffffff
 }audio_property_type;
 
-audio_property_type get_audio_2ndmic_type(void);
+audio_property_type get_audio_dts_enable(void);
+audio_property_type get_audio_spkmic_type(void);
 audio_property_type get_audio_speaker_type(void);
 audio_property_type get_audio_fm_type(void);
 audio_property_type get_audio_fir_enabled(void);
@@ -433,12 +448,11 @@ struct aps9900_hw_platform_data {
 #endif
 typedef enum
 {
-   HW_MIRROR_AND_FLIP = 0,    /* mirror and flip */
    HW_NOT_MIRROR_OR_FLIP,          /* not mirror or fliP */
+   HW_MIRROR_AND_FLIP,    /* mirror and flip */
    HW_CAMERA_NONES = 0xF,	
 }hw_camera_type;
 hw_camera_type get_hw_camera_mirror_type(void);
-
 typedef enum
 {
     CAMERA_FLASH_LED_SINGLE = 0,    /* one led flash */
@@ -447,5 +461,21 @@ typedef enum
 }hw_camera_flash_number;
 
 hw_camera_flash_number get_hw_camera_flash_number(void);
+/*4pin battery voltage id*/
+typedef enum
+{
+	BATTERY_RESISTANCE_MV_10 = 3,
+	BATTERY_RESISTANCE_MV_22 = 6,
+	BATTERY_RESISTANCE_MV_40 = 9,
+	BATTERY_RESISTANCE_MV_68 = 13,
+	BATTERY_RESISTANCE_MV_110_1 = 15,
+	BATTERY_RESISTANCE_MV_110_2 = 16,
+	BATTERY_RESISTANCE_MV_200 = 19,
+	BATTERY_RESISTANCE_MV_470_1 = 22,
+	BATTERY_RESISTANCE_MV_470_2 = 23,
+	BATTERY_RESISTANCE_MV_DEFAULT = 0xFF,
+}hw_battery_id_mv;
+hw_battery_id_mv get_battery_resistance_id(void);
+char* get_battery_manufacturer_info(void);
 #endif
 

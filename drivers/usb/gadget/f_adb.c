@@ -48,6 +48,7 @@ struct adb_dev {
 	atomic_t read_excl;
 	atomic_t write_excl;
 	atomic_t open_excl;
+	struct delayed_work adb_release_w;
 
 	struct list_head tx_idle;
 
@@ -111,6 +112,8 @@ static struct usb_descriptor_header *hs_adb_descs[] = {
 	NULL,
 };
 
+static void adb_ready_callback(void);
+static void adb_closed_callback(void);
 
 /* temporary variable used between adb_open() and adb_gadget_bind() */
 static struct adb_dev *_adb_dev;
@@ -205,7 +208,7 @@ static void adb_complete_out(struct usb_ep *ep, struct usb_request *req)
 	struct adb_dev *dev = _adb_dev;
 
 	dev->rx_done = 1;
-	if (req->status != 0)
+	if (req->status != 0 && req->status != -ECONNRESET)
 		atomic_set(&dev->error, 1);
 
 	wake_up(&dev->read_wq);
@@ -314,6 +317,7 @@ requeue_req:
 	/* wait for a request to complete */
 	ret = wait_event_interruptible(dev->read_wq, dev->rx_done);
 	if (ret < 0) {
+		if (ret != -ERESTARTSYS)
 		atomic_set(&dev->error, 1);
 		r = ret;
 		usb_ep_dequeue(dev->ep_out, req);
@@ -406,9 +410,14 @@ static ssize_t adb_write(struct file *fp, const char __user *buf,
 	return r;
 }
 
+static void adb_release_work(struct work_struct *w)
+{
+	adb_closed_callback();
+}
+
 static int adb_open(struct inode *ip, struct file *fp)
 {
-	printk(KERN_INFO "adb_open\n");
+	pr_info("adb_open\n");
 	if (!_adb_dev)
 		return -ENODEV;
 
@@ -420,18 +429,33 @@ static int adb_open(struct inode *ip, struct file *fp)
 	/* clear the error latch */
 	atomic_set(&_adb_dev->error, 0);
 
+	if (!cancel_delayed_work_sync(&_adb_dev->adb_release_w))
+		adb_ready_callback();
+
 	return 0;
 }
 
 static int adb_release(struct inode *ip, struct file *fp)
 {
-	printk(KERN_INFO "adb_release\n");
+	pr_info("adb_release\n");
+
+	/*
+	 * When USB cable is plugged out, adb reader is unblocked and
+	 * -EIO is returned to user space. adb daemon reopen the port
+	 * which would disable and enable USB configuration unnecessarily.
+	 *
+	 * Delay notifying the adb close event to android by 1 sec. If
+	 * ADB daemon opens the port with in 1 sec, USB configuration
+	 * re-enable does not happen.
+	 */
+	schedule_delayed_work(&_adb_dev->adb_release_w, msecs_to_jiffies(1000));
+
 	adb_unlock(&_adb_dev->open_excl);
 	return 0;
 }
 
 /* file operations for ADB device /dev/android_adb */
-static struct file_operations adb_fops = {
+static const struct file_operations adb_fops = {
 	.owner = THIS_MODULE,
 	.read = adb_read,
 	.write = adb_write,
@@ -600,6 +624,7 @@ static int adb_setup(void)
 	atomic_set(&dev->read_excl, 0);
 	atomic_set(&dev->write_excl, 0);
 
+	INIT_DELAYED_WORK(&dev->adb_release_w, adb_release_work);
 	INIT_LIST_HEAD(&dev->tx_idle);
 
 	_adb_dev = dev;

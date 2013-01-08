@@ -18,7 +18,6 @@
 #ifndef __MFD_PM8921_H
 #define __MFD_PM8921_H
 
-#include <linux/device.h>
 #include <linux/mfd/pm8xxx/irq.h>
 #include <linux/mfd/pm8xxx/gpio.h>
 #include <linux/mfd/pm8xxx/mpp.h>

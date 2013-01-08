@@ -16,6 +16,7 @@
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
+#include <linux/module.h>
 #include <linux/bitops.h>
 #include <linux/clk.h>
 #include <linux/debugfs.h>
@@ -26,6 +27,7 @@
 #include <linux/pci.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
+#include <linux/slab.h>
 #include <linux/types.h>
 #include <asm/mach/pci.h>
 #include <mach/gpiomux.h>
@@ -71,6 +73,9 @@
 #define RD 0
 #define WR 1
 
+/* PCIE AXI address space */
+#define PCIE_AXI_CONF_SIZE   SZ_1M
+
 /* debug mask sys interface */
 static int msm_pcie_debug_mask;
 module_param_named(debug_mask, msm_pcie_debug_mask,
@@ -78,12 +83,15 @@ module_param_named(debug_mask, msm_pcie_debug_mask,
 
 /* resources from device file */
 enum msm_pcie_res {
+	/* platform defined resources */
 	MSM_PCIE_RES_PARF,
 	MSM_PCIE_RES_ELBI,
 	MSM_PCIE_RES_PCIE20,
-	MSM_PCIE_RES_AXI_BAR,
-	MSM_PCIE_RES_AXI_CONF,
-	MSM_PCIE_MAX_RES
+	MSM_PCIE_MAX_PLATFORM_RES,
+
+	/* other resources */
+	MSM_PCIE_RES_AXI_CONF = MSM_PCIE_MAX_PLATFORM_RES,
+	MSM_PCIE_MAX_RES,
 };
 
 /* msm pcie device data */
@@ -106,11 +114,10 @@ static struct msm_pcie_clk_info_t msm_pcie_clk_info[MSM_PCIE_MAX_CLK] = {
 
 /* resources */
 static struct msm_pcie_res_info_t msm_pcie_res_info[MSM_PCIE_MAX_RES] = {
-	{"parf",     0, 0, 0},
-	{"elbi",     0, 0, 0},
-	{"pcie20",   0, 0, 0},
-	{"axi_bar",  0, 0, 0},
-	{"axi_conf", 0, 0, 0},
+	{"pcie_parf",     0, 0},
+	{"pcie_elbi",     0, 0},
+	{"pcie20",        0, 0},
+	{"pcie_axi_conf", 0, 0},
 };
 
 int msm_pcie_get_debug_mask(void)
@@ -349,8 +356,7 @@ static void msm_pcie_clk_deinit(void)
 static void __init msm_pcie_config_controller(void)
 {
 	struct msm_pcie_dev_t *dev = &msm_pcie_dev;
-	struct msm_pcie_res_info_t *axi_bar = &dev->res[MSM_PCIE_RES_AXI_BAR];
-	struct msm_pcie_res_info_t *axi_conf = &dev->res[MSM_PCIE_RES_AXI_CONF];
+	struct resource *axi_conf = dev->res[MSM_PCIE_RES_AXI_CONF].resource;
 
 	/*
 	 * program and enable address translation region 0 (device config
@@ -383,9 +389,9 @@ static void __init msm_pcie_config_controller(void)
 
 	writel_relaxed(0, dev->pcie20 + PCIE20_PLR_IATU_CTRL1);
 	writel_relaxed(BIT(31), dev->pcie20 + PCIE20_PLR_IATU_CTRL2);
-	writel_relaxed(axi_bar->start, dev->pcie20 + PCIE20_PLR_IATU_LBAR);
+	writel_relaxed(dev->axi_bar_start, dev->pcie20 + PCIE20_PLR_IATU_LBAR);
 	writel_relaxed(0, dev->pcie20 + PCIE20_PLR_IATU_UBAR);
-	writel_relaxed(axi_bar->end, dev->pcie20 + PCIE20_PLR_IATU_LAR);
+	writel_relaxed(dev->axi_bar_end, dev->pcie20 + PCIE20_PLR_IATU_LAR);
 	writel_relaxed(MSM_PCIE_DEV_BAR_ADDR,
 		       dev->pcie20 + PCIE20_PLR_IATU_LTAR);
 	writel_relaxed(0, dev->pcie20 + PCIE20_PLR_IATU_UTAR);
@@ -403,8 +409,15 @@ static int __init msm_pcie_get_resources(struct platform_device *pdev)
 	for (i = 0; i < MSM_PCIE_MAX_RES; i++) {
 		info = &dev->res[i];
 
-		res = platform_get_resource_byname(pdev,
-						   IORESOURCE_MEM, info->name);
+		if (i < MSM_PCIE_MAX_PLATFORM_RES) {
+			res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+							   info->name);
+		} else {
+			res = dev->res[i].resource;
+			if (request_resource(&iomem_resource, res))
+				res = NULL;
+		}
+
 		if (!res) {
 			pr_err("can't get %s resource\n", info->name);
 			rc = -ENOMEM;
@@ -418,14 +431,15 @@ static int __init msm_pcie_get_resources(struct platform_device *pdev)
 			break;
 		}
 
-		info->start = res->start;
-		info->end = res->end;
+		info->resource = res;
 	}
 
 	if (rc) {
 		while (i--) {
 			iounmap(dev->res[i].base);
 			dev->res[i].base = NULL;
+			if (i >= MSM_PCIE_MAX_PLATFORM_RES)
+				release_resource(dev->res[i].resource);
 		}
 	} else {
 		dev->parf = dev->res[MSM_PCIE_RES_PARF].base;
@@ -444,6 +458,8 @@ static void msm_pcie_release_resources(void)
 	for (i = 0; i < MSM_PCIE_MAX_RES; i++) {
 		iounmap(msm_pcie_dev.res[i].base);
 		msm_pcie_dev.res[i].base = NULL;
+		if (i >= MSM_PCIE_MAX_PLATFORM_RES)
+			release_resource(msm_pcie_dev.res[i].resource);
 	}
 
 	msm_pcie_dev.parf = NULL;
@@ -461,6 +477,13 @@ static int __init msm_pcie_setup(int nr, struct pci_sys_data *sys)
 	PCIE_DBG("bus %d\n", nr);
 	if (nr != 0)
 		return 0;
+
+	/*
+	 * specify linux PCI framework to allocate device memory (BARs)
+	 * from msm_pcie_dev.dev_mem_res resource.
+	 */
+	sys->mem_offset = 0;
+	pci_add_resource(&sys->resources, &msm_pcie_dev.dev_mem_res);
 
 	/* assert PCIe reset link to keep EP in reset */
 	gpio_set_value_cansleep(dev->gpio[MSM_PCIE_GPIO_RST_N].num,
@@ -555,12 +578,13 @@ static struct pci_bus __init *msm_pcie_scan_bus(int nr,
 
 	PCIE_DBG("bus %d\n", nr);
 	if (nr == 0)
-		bus = pci_scan_bus(sys->busnr, &msm_pcie_ops, sys);
+		bus = pci_scan_root_bus(NULL, sys->busnr, &msm_pcie_ops, sys,
+					&sys->resources);
 
 	return bus;
 }
 
-static int __init msm_pcie_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
+static int __init msm_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 {
 	PCIE_DBG("slot %d pin %d\n", slot, pin);
 	return (pin <= 4) ? (PCIE20_INTA + pin - 1) : 0;
@@ -577,6 +601,7 @@ static struct hw_pci msm_pci __initdata = {
 static int __init msm_pcie_probe(struct platform_device *pdev)
 {
 	const struct msm_pcie_platform *pdata;
+	struct resource *res;
 	int rc;
 
 	PCIE_DBG("\n");
@@ -587,6 +612,31 @@ static int __init msm_pcie_probe(struct platform_device *pdev)
 	msm_pcie_dev.vreg = msm_pcie_vreg_info;
 	msm_pcie_dev.clk = msm_pcie_clk_info;
 	msm_pcie_dev.res = msm_pcie_res_info;
+
+	/* device memory resource */
+	res = &msm_pcie_dev.dev_mem_res;
+	res->name = "pcie_dev_mem";
+	res->start = MSM_PCIE_DEV_BAR_ADDR;
+	res->end = res->start + pdata->axi_size - 1;
+	res->flags = IORESOURCE_MEM;
+
+	/* axi address space = axi bar space + axi config space */
+	msm_pcie_dev.axi_bar_start = pdata->axi_addr;
+	msm_pcie_dev.axi_bar_end = pdata->axi_addr + pdata->axi_size -
+					PCIE_AXI_CONF_SIZE - 1;
+
+	/* axi config space resource */
+	res = kzalloc(sizeof(*res), GFP_KERNEL);
+	if (!res) {
+		pr_err("can't allocate memory\n");
+		return -ENOMEM;
+	}
+
+	msm_pcie_dev.res[MSM_PCIE_RES_AXI_CONF].resource = res;
+	res->name = msm_pcie_dev.res[MSM_PCIE_RES_AXI_CONF].name;
+	res->start = msm_pcie_dev.axi_bar_end + 1;
+	res->end = res->start + PCIE_AXI_CONF_SIZE - 1;
+	res->flags = IORESOURCE_MEM;
 
 	rc = msm_pcie_get_resources(msm_pcie_dev.pdev);
 	if (rc)
@@ -631,37 +681,46 @@ static struct platform_driver msm_pcie_driver = {
 static int __init msm_pcie_init(void)
 {
 	PCIE_DBG("\n");
+	pcibios_min_mem = 0x10000000;
 	return platform_driver_probe(&msm_pcie_driver, msm_pcie_probe);
 }
 subsys_initcall(msm_pcie_init);
 
 /* RC do not represent the right class; set it to PCI_CLASS_BRIDGE_PCI */
-static void __devinit msm_pcie_fixup_header(struct pci_dev *dev)
+static void __devinit msm_pcie_fixup_early(struct pci_dev *dev)
 {
 	PCIE_DBG("hdr_type %d\n", dev->hdr_type);
 	if (dev->hdr_type == 1)
 		dev->class = (dev->class & 0xff) | (PCI_CLASS_BRIDGE_PCI << 8);
 }
-DECLARE_PCI_FIXUP_HEADER(PCIE_VENDOR_ID_RCP, PCIE_DEVICE_ID_RCP,
-			 msm_pcie_fixup_header);
+DECLARE_PCI_FIXUP_EARLY(PCIE_VENDOR_ID_RCP, PCIE_DEVICE_ID_RCP,
+			msm_pcie_fixup_early);
 
 /*
- * actual physical (BAR) address of the device resources starts from 0x10xxxxxx;
- * the system axi address for the device resources starts from 0x08xxxxxx;
- * correct the device resource structure here; address translation unit handles
- * the required translations
+ * actual physical (BAR) address of the device resources starts from
+ * MSM_PCIE_DEV_BAR_ADDR; the system axi address for the device resources starts
+ * from msm_pcie_dev.axi_bar_start; correct the device resource structure here;
+ * address translation unit handles the required translations
  */
 static void __devinit msm_pcie_fixup_final(struct pci_dev *dev)
 {
 	int i;
+	struct resource *res;
 
 	PCIE_DBG("vendor 0x%x 0x%x\n", dev->vendor, dev->device);
 	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
-		if (dev->resource[i].start & 0xFF000000) {
-			dev->resource[i].start &= 0x00FFFFFF;
-			dev->resource[i].start |= 0x08000000;
-			dev->resource[i].end &= 0x00FFFFFF;
-			dev->resource[i].end |= 0x08000000;
+		res = &dev->resource[i];
+		if (res->start & MSM_PCIE_DEV_BAR_ADDR) {
+			res->start -= MSM_PCIE_DEV_BAR_ADDR;
+			res->start += msm_pcie_dev.axi_bar_start;
+			res->end -= MSM_PCIE_DEV_BAR_ADDR;
+			res->end += msm_pcie_dev.axi_bar_start;
+
+			/* If Root Port, request for the changed resource */
+			if ((dev->vendor == PCIE_VENDOR_ID_RCP) &&
+			    (dev->device == PCIE_DEVICE_ID_RCP)) {
+				insert_resource(&iomem_resource, res);
+			}
 		}
 	}
 }

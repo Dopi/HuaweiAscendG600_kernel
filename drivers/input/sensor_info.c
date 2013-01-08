@@ -16,6 +16,7 @@ Problem NO.         Name        Time         Reason
 #include <linux/platform_device.h>
 #include <linux/err.h>
 #include <linux/sensors.h>
+#include <linux/module.h>
 
 static char *sensor_binder_input[SENSOR_MAX] = {NULL};
 

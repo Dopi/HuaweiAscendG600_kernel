@@ -25,9 +25,9 @@
  * If you have forgotten the alphabetical order let VIM/EMACS
  * do that for you.
  */
-#define gadget_is_amd5536udc(g)	(!strcmp("amd5536udc", (g)->name))
+#define gadget_is_amd5536udc(g)		(!strcmp("amd5536udc", (g)->name))
 #define gadget_is_at91(g)		(!strcmp("at91_udc", (g)->name))
-#define gadget_is_atmel_usba(g)	(!strcmp("atmel_usba_udc", (g)->name))
+#define gadget_is_atmel_usba(g)		(!strcmp("atmel_usba_udc", (g)->name))
 #define gadget_is_ci13xxx_msm(g)	(!strcmp("ci13xxx_msm", (g)->name))
 #define gadget_is_ci13xxx_msm_hsic(g)	(!strcmp("ci13xxx_msm_hsic", (g)->name))
 #define gadget_is_ci13xxx_pci(g)	(!strcmp("ci13xxx_pci", (g)->name))
@@ -116,12 +116,14 @@ static inline int usb_gadget_controller_number(struct usb_gadget *gadget)
 		return 0x29;
 	else if (gadget_is_s3c_hsudc(gadget))
 		return 0x30;
-	else if (gadget_is_msm72k(gadget))
+	else if (gadget_is_net2272(gadget))
 		return 0x31;
-	else if (gadget_is_ci13xxx_msm_hsic(gadget))
-		return 0x32;
 	else if (gadget_is_dwc3(gadget))
+		return 0x32;
+	else if (gadget_is_msm72k(gadget))
 		return 0x33;
+	else if (gadget_is_ci13xxx_msm_hsic(gadget))
+		return 0x34;
 
 	return -ENOENT;
 }

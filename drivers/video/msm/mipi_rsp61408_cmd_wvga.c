@@ -377,7 +377,7 @@ static int rsp61408_config_auto_cabc(struct msmfb_cabc_config cabc_cfg,struct ms
 	if(likely(0 == ret))
 	{
 		process_mipi_table(mfd,&rsp61408_tx_buf,(struct sequence*)&rsp61408_auto_cabc_set_table,
-			 ARRAY_SIZE(rsp61408_auto_cabc_set_table), MIPI_RSP61408_BYD_WVGA);
+			 ARRAY_SIZE(rsp61408_auto_cabc_set_table), lcd_panel_wvga);
 	}
 
     LCD_DEBUG("%s: change cabc mode to %d\n",__func__,cabc_cfg.mode);
@@ -443,8 +443,8 @@ static int __init mipi_cmd_rsp61408_wvga_init(void)
 	struct msm_panel_info *pinfo = NULL;
 
 	lcd_panel_wvga = get_lcd_panel_type();
-	if ((MIPI_RSP61408_CHIMEI_WVGA!= lcd_panel_wvga )&&(MIPI_RSP61408_BYD_WVGA!= lcd_panel_wvga )
-		&&(MIPI_RSP61408_TRULY_WVGA!= lcd_panel_wvga))
+	if ((MIPI_CMD_RSP61408_CHIMEI_WVGA!= lcd_panel_wvga )&&(MIPI_CMD_RSP61408_BYD_WVGA!= lcd_panel_wvga )
+		&&(MIPI_CMD_RSP61408_TRULY_WVGA!= lcd_panel_wvga))
 	{
 		return 0;
 	}

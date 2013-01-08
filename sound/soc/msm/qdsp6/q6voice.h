@@ -16,11 +16,25 @@
 #include <linux/ion.h>
 
 #define MAX_VOC_PKT_SIZE 642
-#define SESSION_NAME_LEN 20
+#define SESSION_NAME_LEN 21
 
 #define VOC_REC_UPLINK		0x00
 #define VOC_REC_DOWNLINK	0x01
 #define VOC_REC_BOTH		0x02
+
+/* Needed for VOIP & VOLTE support */
+/* Due to Q6 memory map issue */
+enum {
+	VOIP_CAL,
+	VOLTE_CAL,
+	NUM_VOICE_CAL_BUFFERS
+};
+
+enum {
+	CVP_CAL,
+	CVS_CAL,
+	NUM_VOICE_CAL_TYPES
+};
 
 struct voice_header {
 	uint32_t id;
@@ -913,12 +927,17 @@ struct voice_data {
 };
 
 struct cal_mem {
-	struct ion_handle *handle;
-	uint32_t phy;
-	void *buf;
+	/* Physical Address */
+	uint32_t paddr;
+	/* Kernel Virtual Address */
+	uint32_t kvaddr;
 };
 
-#define MAX_VOC_SESSIONS 3
+struct cal_data {
+	struct cal_mem	cal_data[NUM_VOICE_CAL_TYPES];
+};
+
+#define MAX_VOC_SESSIONS 4
 #define SESSION_ID_BASE 0xFFF0
 
 struct common_data {
@@ -934,9 +953,9 @@ struct common_data {
 	/* APR to CVP in the Q6 */
 	void *apr_q6_cvp;
 
-	struct ion_client *client;
-	struct cal_mem cvp_cal;
-	struct cal_mem cvs_cal;
+	struct ion_client *ion_client;
+	struct ion_handle *ion_handle;
+	struct cal_data voice_cal[NUM_VOICE_CAL_BUFFERS];
 
 	struct mutex common_lock;
 
@@ -990,6 +1009,7 @@ uint8_t voc_get_route_flag(uint16_t session_id, uint8_t path_dir);
 #define VOICE_SESSION_NAME "Voice session"
 #define VOIP_SESSION_NAME "VoIP session"
 #define VOLTE_SESSION_NAME "VoLTE session"
+#define SGLTE_SESSION_NAME "SGLTE session"
 uint16_t voc_get_session_id(char *name);
 
 int voc_start_playback(uint32_t set);

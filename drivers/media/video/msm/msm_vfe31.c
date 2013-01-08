@@ -33,6 +33,7 @@ static uint32_t recording_flag = RECORDING_OFF;
 /*when init, previous frame is recording because the start preview frame can not be removed*/
 static uint32_t recording_frame_flag = PREVIOUS_FRAME_IS_RECORDING;
 #endif
+
 static struct vfe31_ctrl_type *vfe31_ctrl;
 static struct msm_camera_io_clk camio_clk;
 static void *vfe_syncdata;

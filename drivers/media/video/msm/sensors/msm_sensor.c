@@ -18,9 +18,8 @@
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
 #include <linux/hw_dev_dec.h>
 #endif
-
-static int csi_config;
-static bool standby_mode;
+int csi_config=0;
+bool standby_mode=false;
 int is_first_preview_frame =1;
 /*=============================================================*/
 int32_t msm_sensor_adjust_frame_lines(struct msm_sensor_ctrl_t *s_ctrl,
@@ -272,9 +271,6 @@ int32_t msm_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 {
 	int32_t rc = 0;
 
-	v4l2_subdev_notify(&s_ctrl->sensor_v4l2_subdev,
-		NOTIFY_ISPIF_STREAM, (void *)ISPIF_STREAM(
-		PIX_0, ISPIF_OFF_IMMEDIATELY));
 	s_ctrl->func_tbl->sensor_stop_stream(s_ctrl);
 	msleep(30);
 	if (update_type == MSM_SENSOR_REG_INIT) {
@@ -294,8 +290,6 @@ int32_t msm_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 			v4l2_subdev_notify(&s_ctrl->sensor_v4l2_subdev,
 				NOTIFY_CSID_CFG,
 				&s_ctrl->curr_csi_params->csid_params);
-			v4l2_subdev_notify(&s_ctrl->sensor_v4l2_subdev,
-						NOTIFY_CID_CHANGE, NULL);
 			mb();
 			v4l2_subdev_notify(&s_ctrl->sensor_v4l2_subdev,
 				NOTIFY_CSIPHY_CFG,
@@ -307,9 +301,6 @@ int32_t msm_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 		v4l2_subdev_notify(&s_ctrl->sensor_v4l2_subdev,
 			NOTIFY_PCLK_CHANGE, &s_ctrl->msm_sensor_reg->
 			output_settings[res].op_pixel_clk);
-		v4l2_subdev_notify(&s_ctrl->sensor_v4l2_subdev,
-			NOTIFY_ISPIF_STREAM, (void *)ISPIF_STREAM(
-			PIX_0, ISPIF_ON_FRAME_BOUNDARY));
 		s_ctrl->func_tbl->sensor_start_stream(s_ctrl);
 		msleep(30);
 	}
@@ -329,7 +320,7 @@ int32_t msm_sensor_set_sensor_mode(struct msm_sensor_ctrl_t *s_ctrl,
 			s_ctrl->msm_sensor_reg->
 			output_settings[res].line_length_pclk;
 
-		if (s_ctrl->sensordata->pdata->is_csic ||
+		if (s_ctrl->is_csic ||
 			!s_ctrl->sensordata->csi_if)
 			rc = s_ctrl->func_tbl->sensor_csi_setting(s_ctrl,
 				MSM_SENSOR_UPDATE_PERIODIC, res);
@@ -356,7 +347,7 @@ int32_t msm_sensor_mode_init(struct msm_sensor_ctrl_t *s_ctrl,
 		s_ctrl->curr_res = MSM_SENSOR_INVALID_RES;
 		s_ctrl->cam_mode = mode;
 
-		if (s_ctrl->sensordata->pdata->is_csic ||
+		if (s_ctrl->is_csic ||
 			!s_ctrl->sensordata->csi_if)
 			rc = s_ctrl->func_tbl->sensor_csi_setting(s_ctrl,
 				MSM_SENSOR_REG_INIT, 0);
@@ -388,10 +379,11 @@ int32_t msm_sensor_release(struct msm_sensor_ctrl_t *s_ctrl)
 	CDBG("%s called\n", __func__);
 	s_ctrl->func_tbl->sensor_stop_stream(s_ctrl);
 	if (s_ctrl->curr_res != MSM_SENSOR_INVALID_RES) {
-		fps = s_ctrl->msm_sensor_reg->
-			output_settings[s_ctrl->curr_res].vt_pixel_clk /
-			s_ctrl->curr_frame_length_lines /
-			s_ctrl->curr_line_length_pclk;
+		if(s_ctrl->curr_frame_length_lines && s_ctrl->curr_line_length_pclk)
+			fps = s_ctrl->msm_sensor_reg->
+				output_settings[s_ctrl->curr_res].vt_pixel_clk /
+				s_ctrl->curr_frame_length_lines /
+				s_ctrl->curr_line_length_pclk;
         if(0 != fps)
         {
          	delay = 1000 / fps;
@@ -414,9 +406,30 @@ long msm_sensor_subdev_ioctl(struct v4l2_subdev *sd,
 		return s_ctrl->func_tbl->sensor_config(s_ctrl, argp);
 	case VIDIOC_MSM_SENSOR_RELEASE:
 		return msm_sensor_release(s_ctrl);
+	case VIDIOC_MSM_SENSOR_CSID_INFO: {
+		struct msm_sensor_csi_info *csi_info =
+			(struct msm_sensor_csi_info *)arg;
+		s_ctrl->csid_version = csi_info->csid_version;
+		s_ctrl->is_csic = csi_info->is_csic;
+		return 0;
+	}
 	default:
 		return -ENOIOCTLCMD;
 	}
+}
+
+int32_t msm_sensor_get_csi_params(struct msm_sensor_ctrl_t *s_ctrl,
+		struct csi_lane_params_t *sensor_output_info)
+{
+	sensor_output_info->csi_lane_assign = s_ctrl->sensordata->
+		sensor_platform_info->csi_lane_params->csi_lane_assign;
+	sensor_output_info->csi_lane_mask = s_ctrl->sensordata->
+		sensor_platform_info->csi_lane_params->csi_lane_mask;
+	sensor_output_info->csi_if = s_ctrl->sensordata->csi_if;
+	sensor_output_info->csid_core = s_ctrl->sensordata->
+			pdata[0].csid_core;
+	sensor_output_info->csid_version = s_ctrl->csid_version;
+	return 0;
 }
 
 int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
@@ -554,6 +567,37 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 				rc = -EFAULT;
 			break;
 
+		case CFG_START_STREAM:
+			if (s_ctrl->func_tbl->sensor_start_stream == NULL) {
+				rc = -EFAULT;
+				break;
+			}
+			s_ctrl->func_tbl->sensor_start_stream(s_ctrl);
+			break;
+
+		case CFG_STOP_STREAM:
+			if (s_ctrl->func_tbl->sensor_stop_stream == NULL) {
+				rc = -EFAULT;
+				break;
+			}
+			s_ctrl->func_tbl->sensor_stop_stream(s_ctrl);
+			break;
+
+		case CFG_GET_CSI_PARAMS:
+			if (s_ctrl->func_tbl->sensor_get_csi_params == NULL) {
+				rc = -EFAULT;
+				break;
+			}
+			rc = s_ctrl->func_tbl->sensor_get_csi_params(
+				s_ctrl,
+				&cdata.cfg.csi_lane_params);
+
+			if (copy_to_user((void *)argp,
+				&cdata,
+				sizeof(struct sensor_cfg_data)))
+				rc = -EFAULT;
+			break;
+
 		default:
 			rc = -EFAULT;
 			break;
@@ -633,6 +677,7 @@ int32_t msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
     		goto enable_vreg_failed;
     	}
     }
+	usleep_range(5000, 6000);/*the delay between pwd and VDD*/
 	rc = msm_camera_config_gpio_table(data, 1);
 	if (rc < 0) {
 		pr_err("%s: config gpio failed\n", __func__);
@@ -649,7 +694,7 @@ int32_t msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 		goto enable_clk_failed;
 	}
 
-	usleep_range(1000, 2000);
+	usleep_range(2000, 3000); /* delay between clk and I2C Enable*/
 	if (data->sensor_platform_info->ext_power_ctrl != NULL)
 		data->sensor_platform_info->ext_power_ctrl(1);
 
@@ -829,7 +874,6 @@ int32_t msm_sensor_i2c_probe(struct i2c_client *client,
 	}
 #endif
 
-	printk("%s: %s probe succeed!! \n",__func__,id->name);
 	snprintf(s_ctrl->sensor_v4l2_subdev.name,
 		sizeof(s_ctrl->sensor_v4l2_subdev.name), "%s", id->name);
 	v4l2_i2c_subdev_init(&s_ctrl->sensor_v4l2_subdev, client,

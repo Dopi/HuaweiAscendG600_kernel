@@ -18,7 +18,7 @@
  * Revised by AKM 2010/11/15
  *
  */
-
+#include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/i2c.h>
 #include <linux/slab.h>
@@ -63,7 +63,9 @@
 #endif
 
 #define AKM8962_I2C_NAME "akm8962"
-#define AKM8975C_ID  0x09
+/* modify AKM chip name for chip identify */
+#define AKM8975C_ID  0x08
+#define AKM_MASK     0x78
 enum
 {
     CHIP_AKMD8975 = 0,
@@ -309,14 +311,15 @@ static int AKECS_CheckChipName(void)
 		return ret;
 	}
 	/* Check read data about akm8975 */
-	if(AKM8975C_ID == buffer[0])
+	/* modify AKM chip name for chip identify */
+	if(AKM8975C_ID == ( buffer[0] & AKM_MASK ))
 	{
 		akmd_chip_id = CHIP_AKMD8975C ;
 		printk("My compass is AKM8975\n");
 	}
 	else
 	{
-		printk("It is't AKM8975\n");
+		printk("It is not AKM8975\n");
 		return -ENXIO;
 	}
 	return ret;

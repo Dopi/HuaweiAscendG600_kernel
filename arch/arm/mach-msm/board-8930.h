@@ -15,7 +15,7 @@
 
 #define MSM8930_PHASE_2
 
-#include <linux/regulator/gpio-regulator.h>
+#include <linux/regulator/msm-gpio-regulator.h>
 #include <linux/mfd/pm8xxx/pm8038.h>
 #include <linux/i2c.h>
 #include <linux/i2c/sx150x.h>
@@ -138,5 +138,7 @@ void __init msm8930_init_gpu(void);
 #define MSM_8930_GSBI4_QUP_I2C_BUS_ID 4
 #define MSM_8930_GSBI9_QUP_I2C_BUS_ID 0
 #define MSM_8930_GSBI10_QUP_I2C_BUS_ID 10
+#define MSM_8930_GSBI12_QUP_I2C_BUS_ID 12
 
 extern struct msm_rtb_platform_data msm8930_rtb_pdata;
+extern struct msm_cache_dump_platform_data msm8930_cache_dump_pdata;

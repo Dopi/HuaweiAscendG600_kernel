@@ -13,11 +13,13 @@
 #ifndef _ARCH_ARM_MACH_MSM_MDM_PRIVATE_H
 #define _ARCH_ARM_MACH_MSM_MDM_PRIVATE_H
 
+#define MDM_DEBUG_MASK_VDDMIN_SETUP (0x00000002)
 struct mdm_modem_drv;
 
 struct mdm_ops {
 	void (*power_on_mdm_cb)(struct mdm_modem_drv *mdm_drv);
 	void (*reset_mdm_cb)(struct mdm_modem_drv *mdm_drv);
+	void (*atomic_reset_mdm_cb)(struct mdm_modem_drv *mdm_drv);
 	void (*normal_boot_done_cb)(struct mdm_modem_drv *mdm_drv);
 	void (*power_down_mdm_cb)(struct mdm_modem_drv *mdm_drv);
 	void (*debug_state_changed_cb)(int value);
@@ -35,6 +37,7 @@ struct mdm_modem_drv {
 	unsigned ap2mdm_kpdpwr_n_gpio;
 	unsigned ap2mdm_soft_reset_gpio;
 	unsigned ap2mdm_pmic_pwr_en_gpio;
+	unsigned mdm2ap_pblrdy;
 
 	int mdm_errfatal_irq;
 	int mdm_status_irq;

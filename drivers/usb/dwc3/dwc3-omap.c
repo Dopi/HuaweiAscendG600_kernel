@@ -46,9 +46,9 @@
 #include <linux/dma-mapping.h>
 #include <linux/ioport.h>
 #include <linux/io.h>
-#include <linux/module.h>
+#include <linux/of.h>
 
-#include "io.h"
+#include "core.h"
 
 /*
  * All these registers belong to OMAP's Wrapper around the
@@ -142,6 +142,17 @@ struct dwc3_omap {
 	u32			dma_status:1;
 };
 
+static inline u32 dwc3_omap_readl(void __iomem *base, u32 offset)
+{
+	return readl_relaxed(base + offset);
+}
+
+static inline void dwc3_omap_writel(void __iomem *base, u32 offset, u32 value)
+{
+	writel_relaxed(value, base + offset);
+}
+
+
 static irqreturn_t dwc3_omap_interrupt(int irq, void *_omap)
 {
 	struct dwc3_omap	*omap = _omap;
@@ -149,7 +160,7 @@ static irqreturn_t dwc3_omap_interrupt(int irq, void *_omap)
 
 	spin_lock(&omap->lock);
 
-	reg = dwc3_readl(omap->base, USBOTGSS_IRQSTATUS_1);
+	reg = dwc3_omap_readl(omap->base, USBOTGSS_IRQSTATUS_1);
 
 	if (reg & USBOTGSS_IRQ1_DMADISABLECLR) {
 		dev_dbg(omap->dev, "DMA Disable was Cleared\n");
@@ -183,10 +194,10 @@ static irqreturn_t dwc3_omap_interrupt(int irq, void *_omap)
 	if (reg & USBOTGSS_IRQ1_IDPULLUP_FALL)
 		dev_dbg(omap->dev, "IDPULLUP Fall\n");
 
-	dwc3_writel(omap->base, USBOTGSS_IRQSTATUS_1, reg);
+	dwc3_omap_writel(omap->base, USBOTGSS_IRQSTATUS_1, reg);
 
-	reg = dwc3_readl(omap->base, USBOTGSS_IRQSTATUS_0);
-	dwc3_writel(omap->base, USBOTGSS_IRQSTATUS_0, reg);
+	reg = dwc3_omap_readl(omap->base, USBOTGSS_IRQSTATUS_0);
+	dwc3_omap_writel(omap->base, USBOTGSS_IRQSTATUS_0, reg);
 
 	spin_unlock(&omap->lock);
 
@@ -196,93 +207,106 @@ static irqreturn_t dwc3_omap_interrupt(int irq, void *_omap)
 static int __devinit dwc3_omap_probe(struct platform_device *pdev)
 {
 	struct dwc3_omap_data	*pdata = pdev->dev.platform_data;
+	struct device_node	*node = pdev->dev.of_node;
+
 	struct platform_device	*dwc3;
 	struct dwc3_omap	*omap;
 	struct resource		*res;
+	struct device		*dev = &pdev->dev;
 
+	int			devid;
+	int			size;
 	int			ret = -ENOMEM;
 	int			irq;
 
+	const u32		*utmi_mode;
 	u32			reg;
 
 	void __iomem		*base;
 	void			*context;
 
-	omap = kzalloc(sizeof(*omap), GFP_KERNEL);
+	omap = devm_kzalloc(dev, sizeof(*omap), GFP_KERNEL);
 	if (!omap) {
-		dev_err(&pdev->dev, "not enough memory\n");
-		goto err0;
+		dev_err(dev, "not enough memory\n");
+		return -ENOMEM;
 	}
 
 	platform_set_drvdata(pdev, omap);
 
 	irq = platform_get_irq(pdev, 1);
 	if (irq < 0) {
-		dev_err(&pdev->dev, "missing IRQ resource\n");
-		ret = -EINVAL;
-		goto err1;
+		dev_err(dev, "missing IRQ resource\n");
+		return -EINVAL;
 	}
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	if (!res) {
-		dev_err(&pdev->dev, "missing memory base resource\n");
-		ret = -EINVAL;
-		goto err1;
+		dev_err(dev, "missing memory base resource\n");
+		return -EINVAL;
 	}
 
-	base = ioremap_nocache(res->start, resource_size(res));
+	base = devm_ioremap_nocache(dev, res->start, resource_size(res));
 	if (!base) {
-		dev_err(&pdev->dev, "ioremap failed\n");
+		dev_err(dev, "ioremap failed\n");
+		return -ENOMEM;
+	}
+
+	devid = dwc3_get_device_id();
+	if (devid < 0)
+		return -ENODEV;
+
+	dwc3 = platform_device_alloc("dwc3", devid);
+	if (!dwc3) {
+		dev_err(dev, "couldn't allocate dwc3 device\n");
 		goto err1;
 	}
 
-	dwc3 = platform_device_alloc("dwc3-omap", -1);
-	if (!dwc3) {
-		dev_err(&pdev->dev, "couldn't allocate dwc3 device\n");
+	context = devm_kzalloc(dev, resource_size(res), GFP_KERNEL);
+	if (!context) {
+		dev_err(dev, "couldn't allocate dwc3 context memory\n");
 		goto err2;
 	}
 
-	context = kzalloc(resource_size(res), GFP_KERNEL);
-	if (!context) {
-		dev_err(&pdev->dev, "couldn't allocate dwc3 context memory\n");
-		goto err3;
-	}
-
 	spin_lock_init(&omap->lock);
-	dma_set_coherent_mask(&dwc3->dev, pdev->dev.coherent_dma_mask);
+	dma_set_coherent_mask(&dwc3->dev, dev->coherent_dma_mask);
 
-	dwc3->dev.parent = &pdev->dev;
-	dwc3->dev.dma_mask = pdev->dev.dma_mask;
-	dwc3->dev.dma_parms = pdev->dev.dma_parms;
+	dwc3->dev.parent = dev;
+	dwc3->dev.dma_mask = dev->dma_mask;
+	dwc3->dev.dma_parms = dev->dma_parms;
 	omap->resource_size = resource_size(res);
 	omap->context	= context;
-	omap->dev	= &pdev->dev;
+	omap->dev	= dev;
 	omap->irq	= irq;
 	omap->base	= base;
 	omap->dwc3	= dwc3;
 
-	reg = dwc3_readl(omap->base, USBOTGSS_UTMI_OTG_STATUS);
+	reg = dwc3_omap_readl(omap->base, USBOTGSS_UTMI_OTG_STATUS);
 
-	if (!pdata) {
-		dev_dbg(&pdev->dev, "missing platform data\n");
+	utmi_mode = of_get_property(node, "utmi-mode", &size);
+	if (utmi_mode && size == sizeof(*utmi_mode)) {
+		reg |= *utmi_mode;
 	} else {
-		switch (pdata->utmi_mode) {
-		case DWC3_OMAP_UTMI_MODE_SW:
-			reg |= USBOTGSS_UTMI_OTG_STATUS_SW_MODE;
-			break;
-		case DWC3_OMAP_UTMI_MODE_HW:
-			reg &= ~USBOTGSS_UTMI_OTG_STATUS_SW_MODE;
-			break;
-		default:
-			dev_dbg(&pdev->dev, "UNKNOWN utmi mode %d\n",
-					pdata->utmi_mode);
+		if (!pdata) {
+			dev_dbg(dev, "missing platform data\n");
+		} else {
+			switch (pdata->utmi_mode) {
+			case DWC3_OMAP_UTMI_MODE_SW:
+				reg |= USBOTGSS_UTMI_OTG_STATUS_SW_MODE;
+				break;
+			case DWC3_OMAP_UTMI_MODE_HW:
+				reg &= ~USBOTGSS_UTMI_OTG_STATUS_SW_MODE;
+				break;
+			default:
+				dev_dbg(dev, "UNKNOWN utmi mode %d\n",
+						pdata->utmi_mode);
+			}
 		}
 	}
 
-	dwc3_writel(omap->base, USBOTGSS_UTMI_OTG_STATUS, reg);
+	dwc3_omap_writel(omap->base, USBOTGSS_UTMI_OTG_STATUS, reg);
 
 	/* check the DMA Status */
-	reg = dwc3_readl(omap->base, USBOTGSS_SYSCONFIG);
+	reg = dwc3_omap_readl(omap->base, USBOTGSS_SYSCONFIG);
 	omap->dma_status = !!(reg & USBOTGSS_SYSCONFIG_DMADISABLE);
 
 	/* Set No-Idle and No-Standby */
@@ -292,19 +316,19 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
 	reg |= (USBOTGSS_SYSCONFIG_STANDBYMODE(USBOTGSS_STANDBYMODE_NO_STANDBY)
 		| USBOTGSS_SYSCONFIG_IDLEMODE(USBOTGSS_IDLEMODE_NO_IDLE));
 
-	dwc3_writel(omap->base, USBOTGSS_SYSCONFIG, reg);
+	dwc3_omap_writel(omap->base, USBOTGSS_SYSCONFIG, reg);
 
-	ret = request_irq(omap->irq, dwc3_omap_interrupt, 0,
+	ret = devm_request_irq(dev, omap->irq, dwc3_omap_interrupt, 0,
 			"dwc3-omap", omap);
 	if (ret) {
-		dev_err(&pdev->dev, "failed to request IRQ #%d --> %d\n",
+		dev_err(dev, "failed to request IRQ #%d --> %d\n",
 				omap->irq, ret);
-		goto err4;
+		goto err2;
 	}
 
 	/* enable all IRQs */
 	reg = USBOTGSS_IRQO_COREIRQ_ST;
-	dwc3_writel(omap->base, USBOTGSS_IRQENABLE_SET_0, reg);
+	dwc3_omap_writel(omap->base, USBOTGSS_IRQENABLE_SET_0, reg);
 
 	reg = (USBOTGSS_IRQ1_OEVT |
 			USBOTGSS_IRQ1_DRVVBUS_RISE |
@@ -316,39 +340,29 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
 			USBOTGSS_IRQ1_DISCHRGVBUS_FALL |
 			USBOTGSS_IRQ1_IDPULLUP_FALL);
 
-	dwc3_writel(omap->base, USBOTGSS_IRQENABLE_SET_1, reg);
+	dwc3_omap_writel(omap->base, USBOTGSS_IRQENABLE_SET_1, reg);
 
 	ret = platform_device_add_resources(dwc3, pdev->resource,
 			pdev->num_resources);
 	if (ret) {
-		dev_err(&pdev->dev, "couldn't add resources to dwc3 device\n");
-		goto err5;
+		dev_err(dev, "couldn't add resources to dwc3 device\n");
+		goto err2;
 	}
 
 	ret = platform_device_add(dwc3);
 	if (ret) {
-		dev_err(&pdev->dev, "failed to register dwc3 device\n");
-		goto err5;
+		dev_err(dev, "failed to register dwc3 device\n");
+		goto err2;
 	}
 
 	return 0;
 
-err5:
-	free_irq(omap->irq, omap);
-
-err4:
-	kfree(omap->context);
-
-err3:
+err2:
 	platform_device_put(dwc3);
 
-err2:
-	iounmap(base);
-
 err1:
-	kfree(omap);
+	dwc3_put_device_id(devid);
 
-err0:
 	return ret;
 }
 
@@ -358,11 +372,7 @@ static int __devexit dwc3_omap_remove(struct platform_device *pdev)
 
 	platform_device_unregister(omap->dwc3);
 
-	free_irq(omap->irq, omap);
-	iounmap(omap->base);
-
-	kfree(omap->context);
-	kfree(omap);
+	dwc3_put_device_id(omap->dwc3->id);
 
 	return 0;
 }
@@ -384,18 +394,9 @@ static struct platform_driver dwc3_omap_driver = {
 	},
 };
 
+module_platform_driver(dwc3_omap_driver);
+
+MODULE_ALIAS("platform:omap-dwc3");
 MODULE_AUTHOR("Felipe Balbi <balbi@ti.com>");
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_DESCRIPTION("DesignWare USB3 OMAP Glue Layer");
-
-static int __devinit dwc3_omap_init(void)
-{
-	return platform_driver_register(&dwc3_omap_driver);
-}
-module_init(dwc3_omap_init);
-
-static void __exit dwc3_omap_exit(void)
-{
-	platform_driver_unregister(&dwc3_omap_driver);
-}
-module_exit(dwc3_omap_exit);

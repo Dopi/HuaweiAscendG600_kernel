@@ -14,6 +14,7 @@
 
 #ifdef CONFIG_SPS_SUPPORT_BAMDMA
 
+#include <linux/export.h>
 #include <linux/memory.h>	/* memset */
 
 #include "spsi.h"

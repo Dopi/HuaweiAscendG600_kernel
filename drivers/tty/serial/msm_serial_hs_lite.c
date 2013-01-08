@@ -122,9 +122,15 @@ static struct of_device_id msm_hsl_match_table[] = {
 	},
 	{}
 };
+
+#ifdef CONFIG_SERIAL_MSM_HSL_CONSOLE
+static int get_console_state(struct uart_port *port);
+#else
+static inline int get_console_state(struct uart_port *port) { return -ENODEV; };
+#endif
+
 static struct dentry *debug_base;
 static inline void wait_for_xmitr(struct uart_port *port);
-static int get_console_state(struct uart_port *port);
 static inline void msm_hsl_write(struct uart_port *port,
 				 unsigned int val, unsigned int off)
 {
@@ -628,8 +634,8 @@ static void msm_hsl_set_baud_rate(struct uart_port *port, unsigned int baud)
 		break;
 	}
 
-	/* Set timeout to be ~100x the character transmit time */
-	msm_hsl_port->tx_timeout = 1000000000 / baud;
+	/* Set timeout to be ~600x the character transmit time */
+	msm_hsl_port->tx_timeout = (1000000000 / baud) * 6;
 
 	vid = msm_hsl_port->ver_id;
 	msm_hsl_write(port, baud_code, regmap[vid][UARTDM_CSR]);
@@ -1113,7 +1119,9 @@ static void wait_for_xmitr(struct uart_port *port)
 	if (!(msm_hsl_read(port, regmap[vid][UARTDM_SR]) &
 			UARTDM_SR_TXEMT_BMSK)) {
 		while (!(msm_hsl_read(port, regmap[vid][UARTDM_ISR]) &
-			UARTDM_ISR_TX_READY_BMSK)) {
+			UARTDM_ISR_TX_READY_BMSK) &&
+		       !(msm_hsl_read(port, regmap[vid][UARTDM_SR]) &
+			UARTDM_SR_TXEMT_BMSK)) {
 			udelay(1);
 			touch_nmi_watchdog();
 			cpu_relax();

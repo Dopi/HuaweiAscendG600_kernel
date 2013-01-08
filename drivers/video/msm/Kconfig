@@ -84,6 +84,16 @@ config FB_MSM_MDP40
 	  Support for MSM MDP HW revision 4.0
 	  Say Y here if this is msm7x30 variant platform.
 
+config FB_MSM_MDSS
+	bool "MDSS HW"
+	---help---
+	The Mobile Display Sub System (MDSS) driver supports devices which
+	contain MDSS hardware block.
+
+	The MDSS driver implements frame buffer interface to provide access to
+	the display hardware and provide a way for users to display graphics
+	on connected display panels.
+
 config FB_MSM_MDP_NONE
 	bool "MDP HW None"
 	---help---
@@ -239,8 +249,25 @@ config FB_HUAWEI_MIPI_DSI_OTM8009A
 	bool "support MIPI OTM8009A"
 	select FB_MSM_MIPI_DSI
 	default n
+	
+#/*Add otm8018b for video mode*/
+config FB_HUAWEI_MIPI_DSI_OTM8018B
+	bool "support MIPI OTM8018B"
+	select FB_MSM_MIPI_DSI
+	default n
+
+#/*Add nt35512 for video mode*/
+config FB_HUAWEI_MIPI_DSI_NT35512
+	bool "support MIPI NT35512"
+	select FB_MSM_MIPI_DSI
+	default n
+
 config FB_HUAWEI_MIPI_DSI_NT35310
 	bool "support MIPI NT35310"
+	select FB_MSM_MIPI_DSI
+	default n
+config FB_HUAWEI_MIPI_DSI_OTM8009A_FWVGA
+	bool "support MIPI OTM8009A FWVGA"
 	select FB_MSM_MIPI_DSI
 	default n
 config FB_HUAWEI_MIPI_DSI_HX8357C
@@ -249,6 +276,10 @@ config FB_HUAWEI_MIPI_DSI_HX8357C
 	default n
 config FB_HUAWEI_MIPI_DSI_HX8369A
 	bool "support MIPI HX8369A"
+	select FB_MSM_MIPI_DSI
+	default n
+config FB_HUAWEI_MIPI_DSI_HX8369B
+	bool "support MIPI HX8369B"
 	select FB_MSM_MIPI_DSI
 	default n
 config FB_HUAWEI_LCDC_HX8357B
@@ -393,6 +424,11 @@ config FB_MSM_LVDS_CHIMEI_WXGA
 	select FB_MSM_LVDS
 	default n
 
+config FB_MSM_LVDS_FRC_FHD
+	bool
+	select FB_MSM_LVDS
+	default n
+
 config FB_MSM_MIPI_TOSHIBA_VIDEO_WVGA_PT
 	bool
 	select FB_MSM_MIPI_DSI_TOSHIBA
@@ -485,6 +521,15 @@ config FB_MSM_MIPI_SIMULATOR_VIDEO
 	bool
 	select FB_MSM_MIPI_DSI_SIMULATOR
 	default n
+
+config FB_MSM_NO_MDP_PIPE_CTRL
+	depends on FB_MSM_OVERLAY
+	bool "Do not use mdp_pipe_ctrl"
+	---help---
+	  Saying 'Y' here obsoletes the mdp_pipe_ctrl function,
+	  which was used to control mdp-related clocks. MDP4 vsync-driven
+	  screen updates will use a different clock control mechanism if
+	  this is selected.
 
 config FB_MSM_OVERLAY0_WRITEBACK
 	depends on FB_MSM_OVERLAY
@@ -586,6 +631,15 @@ config FB_MSM_LVDS_CHIMEI_WXGA_PANEL
         ---help---
           Support for LVDS Chimei WXGA(1366x768) panel
 
+config FB_MSM_LVDS_FRC_FHD_PANEL
+	bool "LVDS FRC FHD Panel"
+	select FB_MSM_LVDS_FRC_FHD
+	---help---
+	  Support for LVDS Frc FHD(1920x1080) panel
+	  FRC(Frame Rate Converter) uses LVDS as input
+	  interface. It is treated as a HDMI panel with
+	  1920x1080 resolution.
+
 config FB_MSM_TRY_MDDI_CATCH_LCDC_PRISM
 	depends on FB_MSM_LCDC_HW
 	bool "MDDI Panel Auto Detect + LCDC Prism WVGA"
@@ -664,6 +718,7 @@ config FB_MSM_LCDC_MIPI_PANEL_AUTO_DETECT
 config FB_MSM_LVDS_MIPI_PANEL_DETECT
 	bool "LVDS + MIPI Panel Auto Detect"
 	select FB_MSM_LVDS_CHIMEI_WXGA
+	select FB_MSM_LVDS_FRC_FHD
 	select FB_MSM_MIPI_TOSHIBA_VIDEO_WVGA_PT
 	select FB_MSM_MIPI_TOSHIBA_VIDEO_WSVGA_PT
 	select FB_MSM_MIPI_TOSHIBA_VIDEO_WUXGA
@@ -1004,19 +1059,6 @@ config FB_MSM_DEFAULT_DEPTH_RGBA8888
 
 endchoice
 
-#/* add the code for dynamic gamma function */
-config FB_DYNAMIC_GAMMA
-	bool "Support for DYNAMIC_GAMMA fuction of glory"
-	depends on FB_MSM
-#/* change default state to 'n', move this config to hw7x30_defconfig */
-	default n
-
-#/* Add code for automatic CABC function */
-config FB_AUTO_CABC
-	bool "Support for AUTO_CABC fuction"
-	depends on FB_MSM
-	default n
-
 config FB_MSM_EBI2_EPSON_S1D_QVGA_PANEL
 	bool "EBI2 Epson QVGA Panel"
 	select FB_MSM_EBI2
@@ -1030,4 +1072,21 @@ config FB_MSM_EBI2_PANEL_DETECT
 	default n
 	---help---
 	  Support for EBI2 panel auto detect
+
+if FB_MSM_MDSS
+	source "drivers/video/msm/mdss/Kconfig"
+endif
+#/* add the code for dynamic gamma function */
+config FB_DYNAMIC_GAMMA
+	bool "Support for DYNAMIC_GAMMA fuction of glory"
+	depends on FB_MSM
+#/* change default state to 'n', move this config to hw7x30_defconfig */
+	default n
+
+#/* Add code for automatic CABC function */
+config FB_AUTO_CABC
+	bool "Support for AUTO_CABC fuction"
+	depends on FB_MSM
+	default n
+
 endif

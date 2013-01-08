@@ -39,6 +39,7 @@
 #include <mach/msm_battery.h>
 #endif
 #include <linux/ion.h>
+#include <mach/cpuidle.h>
 DEFINE_MUTEX(ctrl_cmd_lock);
 
 #define CAMERA_STOP_VIDEO 58
@@ -316,7 +317,7 @@ static int msm_pmem_table_add(struct hlist_head *ptype,
 	if (!region)
 		goto out;
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-		region->handle = ion_import_fd(client_for_ion, info->fd);
+		region->handle = ion_import_dma_buf(client_for_ion, info->fd);
 		if (IS_ERR_OR_NULL(region->handle))
 			goto out1;
 		ion_phys(client_for_ion, region->handle,
@@ -3116,7 +3117,7 @@ static int __msm_release(struct msm_sync *sync)
 		msm_queue_drain(&sync->pict_q, list_pict);
 		msm_queue_drain(&sync->event_q, list_config);
 
-		wake_unlock(&sync->wake_lock);
+		pm_qos_update_request(&sync->idle_pm_qos, PM_QOS_DEFAULT_VALUE);
 #ifdef CONFIG_HUAWEI_EVALUATE_POWER_CONSUMPTION 
         /* turn down inside and outside camera consume */
         huawei_rpc_current_consuem_notify(EVENT_CAMERA_STATE, DEVICE_POWER_STATE_OFF);
@@ -3780,7 +3781,8 @@ static int __msm_open(struct msm_cam_device *pmsm, const char *const apps_id,
 	sync->apps_id = apps_id;
 
 	if (!sync->core_powered_on && !is_controlnode) {
-		wake_lock(&sync->wake_lock);
+		pm_qos_update_request(&sync->idle_pm_qos,
+			msm_cpuidle_get_deep_idle_latency());
 
 		msm_camvfe_fn_init(&sync->vfefn, sync);
 		if (sync->vfefn.vfe_init) {
@@ -4007,16 +4009,19 @@ static int msm_sync_init(struct msm_sync *sync,
 	msm_queue_init(&sync->pict_q, "pict");
 	msm_queue_init(&sync->vpe_q, "vpe");
 
+	pm_qos_add_request(&sync->idle_pm_qos, PM_QOS_CPU_DMA_LATENCY,
+					   PM_QOS_DEFAULT_VALUE);
+// J not use wake_lock, so delete here
 #ifdef CONFIG_HUAWEI_KERNEL
     /** do not sleep in camera to help lower the crash probability. qinwei **/
-	wake_lock_init(&sync->wake_lock, WAKE_LOCK_SUSPEND, "msm_camera");
+	//wake_lock_init(&sync->wake_lock, WAKE_LOCK_SUSPEND, "msm_camera");
 #else
-	wake_lock_init(&sync->wake_lock, WAKE_LOCK_IDLE, "msm_camera");
+	//wake_lock_init(&sync->wake_lock, WAKE_LOCK_IDLE, "msm_camera");
 #endif
 
 	rc = msm_camio_probe_on(pdev);
 	if (rc < 0) {
-		wake_lock_destroy(&sync->wake_lock);
+		pm_qos_remove_request(&sync->idle_pm_qos);
 		return rc;
 	}
 	rc = sensor_probe(sync->sdata, &sctrl);
@@ -4031,7 +4036,7 @@ static int msm_sync_init(struct msm_sync *sync,
 		pr_err("%s: failed to initialize %s\n",
 			__func__,
 			sync->sdata->sensor_name);
-		wake_lock_destroy(&sync->wake_lock);
+		pm_qos_remove_request(&sync->idle_pm_qos);
 		return rc;
 	}
 
@@ -4050,7 +4055,7 @@ static int msm_sync_init(struct msm_sync *sync,
 
 static int msm_sync_destroy(struct msm_sync *sync)
 {
-	wake_lock_destroy(&sync->wake_lock);
+	pm_qos_remove_request(&sync->idle_pm_qos);
 	return 0;
 }
 

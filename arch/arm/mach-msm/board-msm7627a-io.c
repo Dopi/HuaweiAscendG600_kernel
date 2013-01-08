@@ -22,6 +22,7 @@
 #include <linux/delay.h>
 #include <linux/atmel_maxtouch.h>
 #include <linux/input/ft5x06_ts.h>
+#include <linux/leds-msm-tricolor.h>
 #include <asm/gpio.h>
 #include <asm/mach-types.h>
 #include <mach/rpc_server_handset.h>
@@ -99,6 +100,39 @@ static const unsigned short keymap[ARRAY_SIZE(kp_col_gpios) *
 	[KP_INDEX(4, 4)] = KEY_VOLUMEDOWN,
 };
 
+/* SURF keypad platform device information */
+#ifndef CONFIG_HUAWEI_GPIO_KEYPAD  /*added by lishubin update to 1215*/
+static struct gpio_event_matrix_info kp_matrix_info = {
+	.info.func	= gpio_event_matrix_func,
+	.keymap		= keymap,
+	.output_gpios	= kp_row_gpios,
+	.input_gpios	= kp_col_gpios,
+	.noutputs	= ARRAY_SIZE(kp_row_gpios),
+	.ninputs	= ARRAY_SIZE(kp_col_gpios),
+	.settle_time.tv64 = 40 * NSEC_PER_USEC,
+	.poll_time.tv64 = 20 * NSEC_PER_MSEC,
+	.flags		= GPIOKPF_LEVEL_TRIGGERED_IRQ | GPIOKPF_DRIVE_INACTIVE |
+			  GPIOKPF_PRINT_UNMAPPED_KEYS,
+};
+
+static struct gpio_event_info *kp_info[] = {
+	&kp_matrix_info.info
+};
+
+static struct gpio_event_platform_data kp_pdata = {
+	.name		= "7x27a_kp",
+	.info		= kp_info,
+	.info_count	= ARRAY_SIZE(kp_info)
+};
+
+static struct platform_device kp_pdev = {
+	.name	= GPIO_EVENT_DEV_NAME,
+	.id	= -1,
+	.dev	= {
+		.platform_data	= &kp_pdata,
+	},
+};
+#endif /*added by lishubin update to 1215*/
 
 /* 8625 keypad device information */
 static unsigned int kp_row_gpios_8625[] = {31};
@@ -121,8 +155,8 @@ static struct gpio_event_matrix_info kp_matrix_info_8625 = {
 	.input_gpios    = kp_col_gpios_8625,
 	.noutputs       = ARRAY_SIZE(kp_row_gpios_8625),
 	.ninputs        = ARRAY_SIZE(kp_col_gpios_8625),
-	.settle_time.tv_nsec = 40 * NSEC_PER_USEC,
-	.poll_time.tv_nsec = 20 * NSEC_PER_MSEC,
+	.settle_time.tv64 = 40 * NSEC_PER_USEC,
+	.poll_time.tv64 = 20 * NSEC_PER_MSEC,
 	.flags          = GPIOKPF_LEVEL_TRIGGERED_IRQ | GPIOKPF_DRIVE_INACTIVE |
 			  GPIOKPF_PRINT_UNMAPPED_KEYS,
 };
@@ -146,32 +180,6 @@ static struct platform_device kp_pdev_8625 = {
 };
 
 #define LED_GPIO_PDM 96
-#define LED_RED_GPIO_8625 49
-#define LED_GREEN_GPIO_8625 34
-
-static struct gpio_led gpio_leds_config_8625[] = {
-	{
-		.name = "green",
-		.gpio = LED_GREEN_GPIO_8625,
-	},
-	{
-		.name = "red",
-		.gpio = LED_RED_GPIO_8625,
-	},
-};
-
-static struct gpio_led_platform_data gpio_leds_pdata_8625 = {
-	.num_leds = ARRAY_SIZE(gpio_leds_config_8625),
-	.leds = gpio_leds_config_8625,
-};
-
-static struct platform_device gpio_leds_8625 = {
-	.name          = "leds-gpio",
-	.id            = -1,
-	.dev           = {
-		.platform_data = &gpio_leds_pdata_8625,
-	},
-};
 
 #define MXT_TS_IRQ_GPIO         48
 #define MXT_TS_RESET_GPIO       26
@@ -213,7 +221,7 @@ struct kobject *mxt_virtual_key_properties_kobj;
 
 static int mxt_vkey_setup(void)
 {
-	int retval;
+	int retval = 0;
 
 	mxt_virtual_key_properties_kobj =
 		kobject_create_and_add("board_properties", NULL);
@@ -275,16 +283,16 @@ static const u8 mxt_config_data_evt[] = {
 	/* T6 Object */
 	0, 0, 0, 0, 0, 0,
 	/* T38 Object */
-	20, 0, 0, 0, 0, 0, 0, 0,
+	20, 1, 0, 25, 9, 12, 0, 0,
 	/* T7 Object */
 	24, 12, 10,
 	/* T8 Object */
-	30, 0, 20, 20, 0, 0, 9, 45, 10, 192,
+	30, 0, 20, 20, 0, 0, 0, 0, 10, 192,
 	/* T9 Object */
-	3, 0, 0, 18, 11, 0, 16, 60, 3, 1,
-	0, 1, 1, 0, 10, 10, 10, 10, 107, 3,
-	223, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-	20, 15, 0, 0, 2,
+	131, 0, 0, 18, 11, 0, 16, 70, 2, 1,
+	0, 2, 1, 62, 10, 10, 10, 10, 107, 3,
+	223, 1, 2, 2, 20, 20, 172, 40, 139, 110,
+	10, 15, 0, 0, 0,
 	/* T15 Object */
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0,
@@ -300,7 +308,7 @@ static const u8 mxt_config_data_evt[] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0,
 	/* T40 Object */
-	17, 0, 0, 30, 30,
+	0, 0, 0, 0, 0,
 	/* T42 Object */
 	3, 20, 45, 40, 128, 0, 0, 0,
 	/* T46 Object */
@@ -308,12 +316,12 @@ static const u8 mxt_config_data_evt[] = {
 	/* T47 Object */
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	/* T48 Object */
-	1, 128, 96, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 6, 6, 0, 0, 63, 4, 64,
-	10, 0, 32, 5, 0, 38, 0, 8, 0, 0,
+	1, 12, 64, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 6, 6, 0, 0, 100, 4, 64,
+	10, 0, 20, 5, 0, 38, 0, 20, 0, 0,
 	0, 0, 0, 0, 16, 65, 3, 1, 1, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0,
+	10, 10, 10, 0, 0, 15, 15, 154, 58, 145,
+	80, 100, 15, 3,
 };
 
 static struct mxt_config_info mxt_config_array[] = {
@@ -414,14 +422,13 @@ err_power_fail:
 
 /* modify function name and gpio config */
 /*Multipe use gpio_request function has been mistakes */
-static int touch_int_gpio_cfg = 0;
+
+/* use gpio free to release */
 static int set_touch_interrupt_gpio(void)
 {
     int gpio_config = 0;
     int ret = 0;
 
-	if (touch_int_gpio_cfg == 0)
-	{
 	gpio_config = GPIO_CFG(MSM_7X27A_TOUCH_INT_PIN,0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP,GPIO_CFG_2MA);
 	ret = gpio_tlmm_config(gpio_config, GPIO_CFG_ENABLE);
 	if (ret)
@@ -435,8 +442,6 @@ static int set_touch_interrupt_gpio(void)
 		pr_err("%s:touch int gpio request failed\n", __func__);
 		return ret;
 	}
-	touch_int_gpio_cfg = 1;
-	}
 	ret = gpio_direction_input(MSM_7X27A_TOUCH_INT_PIN);
 	if (ret)
 	{
@@ -444,6 +449,7 @@ static int set_touch_interrupt_gpio(void)
 		return ret;
 	}
 
+    gpio_free(MSM_7X27A_TOUCH_INT_PIN);
 	return ret;
 }
 /*we use this to detect the probe is detected*/
@@ -467,13 +473,12 @@ static int read_touch_probe_flag(void)
 
 /*this function reset touch panel */
 /*Multipe use gpio_request function has been mistakes */
-static int touch_reset_cfg = 0;
+
+/* use gpio free to release */
 static int touch_reset(void)
 {
 	int ret = 0;
-    int gpio_config = 0;
-	if (touch_reset_cfg == 0)
-	{
+    int gpio_config = 0;	
 	gpio_config = GPIO_CFG(MSM_7x27A_TOUCH_RESET_PIN,0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP,GPIO_CFG_2MA);
 	ret = gpio_tlmm_config(gpio_config, GPIO_CFG_ENABLE);
 	if (ret)
@@ -487,8 +492,6 @@ static int touch_reset(void)
 		pr_err("%s:touch int gpio request failed\n", __func__);
 		return ret;
 	}
-	touch_reset_cfg = 1;
-	}
 	
 	ret = gpio_direction_output(MSM_7x27A_TOUCH_RESET_PIN, 1);
 	mdelay(5);
@@ -497,6 +500,7 @@ static int touch_reset(void)
 	ret = gpio_direction_output(MSM_7x27A_TOUCH_RESET_PIN, 1);
 	mdelay(50);//must more than 10ms.
 
+	gpio_free(MSM_7x27A_TOUCH_RESET_PIN);
 	return ret;
 }
 /*this function return reset gpio at 7x30 platform */
@@ -542,7 +546,7 @@ static int get_touch_resolution(struct tp_resolution_conversion *tp_resolution_t
 	}
 	else if(machine_is_msm8x25_U8951D()
 			|| machine_is_msm8x25_U8951()
-		    ||machine_is_msm8x25_C8951())
+            || machine_is_msm8x25_C8813())
 	{
 	    tp_resolution_type->lcd_x = LCD_X_FWVGA;
 		tp_resolution_type->lcd_y = LCD_Y_FWVGA;   
@@ -983,6 +987,130 @@ static int synaptics_touchpad_setup(void)
 }
 #endif
 
+#ifndef CONFIG_HUAWEI_KERNEL /*added by lishubin update to 1215*/
+static struct regulator_bulk_data regs_atmel[] = {
+	{ .supply = "ldo12", .min_uV = 2700000, .max_uV = 3300000 },
+	{ .supply = "smps3", .min_uV = 1800000, .max_uV = 1800000 },
+};
+
+#define ATMEL_TS_GPIO_IRQ 82
+
+static int atmel_ts_power_on(bool on)
+{
+	int rc = on ?
+		regulator_bulk_enable(ARRAY_SIZE(regs_atmel), regs_atmel) :
+		regulator_bulk_disable(ARRAY_SIZE(regs_atmel), regs_atmel);
+
+	if (rc)
+		pr_err("%s: could not %sable regulators: %d\n",
+				__func__, on ? "en" : "dis", rc);
+	else
+		msleep(50);
+
+	return rc;
+}
+
+static int atmel_ts_platform_init(struct i2c_client *client)
+{
+	int rc;
+	struct device *dev = &client->dev;
+
+	rc = regulator_bulk_get(dev, ARRAY_SIZE(regs_atmel), regs_atmel);
+	if (rc) {
+		dev_err(dev, "%s: could not get regulators: %d\n",
+				__func__, rc);
+		goto out;
+	}
+
+	rc = regulator_bulk_set_voltage(ARRAY_SIZE(regs_atmel), regs_atmel);
+	if (rc) {
+		dev_err(dev, "%s: could not set voltages: %d\n",
+				__func__, rc);
+		goto reg_free;
+	}
+
+	rc = gpio_tlmm_config(GPIO_CFG(ATMEL_TS_GPIO_IRQ, 0,
+				GPIO_CFG_INPUT, GPIO_CFG_PULL_UP,
+				GPIO_CFG_8MA), GPIO_CFG_ENABLE);
+	if (rc) {
+		dev_err(dev, "%s: gpio_tlmm_config for %d failed\n",
+			__func__, ATMEL_TS_GPIO_IRQ);
+		goto reg_free;
+	}
+
+	/* configure touchscreen interrupt gpio */
+	rc = gpio_request(ATMEL_TS_GPIO_IRQ, "atmel_maxtouch_gpio");
+	if (rc) {
+		dev_err(dev, "%s: unable to request gpio %d\n",
+			__func__, ATMEL_TS_GPIO_IRQ);
+		goto ts_gpio_tlmm_unconfig;
+	}
+
+	rc = gpio_direction_input(ATMEL_TS_GPIO_IRQ);
+	if (rc < 0) {
+		dev_err(dev, "%s: unable to set the direction of gpio %d\n",
+			__func__, ATMEL_TS_GPIO_IRQ);
+		goto free_ts_gpio;
+	}
+	return 0;
+
+free_ts_gpio:
+	gpio_free(ATMEL_TS_GPIO_IRQ);
+ts_gpio_tlmm_unconfig:
+	gpio_tlmm_config(GPIO_CFG(ATMEL_TS_GPIO_IRQ, 0,
+				GPIO_CFG_INPUT, GPIO_CFG_NO_PULL,
+				GPIO_CFG_2MA), GPIO_CFG_DISABLE);
+reg_free:
+	regulator_bulk_free(ARRAY_SIZE(regs_atmel), regs_atmel);
+out:
+	return rc;
+}
+
+static int atmel_ts_platform_exit(struct i2c_client *client)
+{
+	gpio_free(ATMEL_TS_GPIO_IRQ);
+	gpio_tlmm_config(GPIO_CFG(ATMEL_TS_GPIO_IRQ, 0,
+				GPIO_CFG_INPUT, GPIO_CFG_NO_PULL,
+				GPIO_CFG_2MA), GPIO_CFG_DISABLE);
+	regulator_bulk_free(ARRAY_SIZE(regs_atmel), regs_atmel);
+	return 0;
+}
+
+static u8 atmel_ts_read_chg(void)
+{
+	return gpio_get_value(ATMEL_TS_GPIO_IRQ);
+}
+
+static u8 atmel_ts_valid_interrupt(void)
+{
+	return !atmel_ts_read_chg();
+}
+
+
+static struct maxtouch_platform_data atmel_ts_pdata = {
+	.numtouch = 4,
+	.init_platform_hw = atmel_ts_platform_init,
+	.exit_platform_hw = atmel_ts_platform_exit,
+	.power_on = atmel_ts_power_on,
+	.display_res_x = 480,
+	.display_res_y = 864,
+	.min_x = ATMEL_X_OFFSET,
+	.max_x = (505 - ATMEL_X_OFFSET),
+	.min_y = ATMEL_Y_OFFSET,
+	.max_y = (863 - ATMEL_Y_OFFSET),
+	.valid_interrupt = atmel_ts_valid_interrupt,
+	.read_chg = atmel_ts_read_chg,
+};
+
+static struct i2c_board_info atmel_ts_i2c_info[] __initdata = {
+	{
+		I2C_BOARD_INFO(ATMEL_TS_I2C_NAME, 0x4a),
+		.platform_data = &atmel_ts_pdata,
+		.irq = MSM_GPIO_TO_INT(ATMEL_TS_GPIO_IRQ),
+	},
+};
+#endif /*added by lishubin update to 1215*/
+
 static struct msm_handset_platform_data hs_platform_data = {
 	.hs_name = "7k_handset",
 	.pwr_key_delay_ms = 500, /* 0 will disable end key */
@@ -1098,8 +1226,8 @@ static struct gpio_event_matrix_info kp_matrix_info_sku3 = {
 	.input_gpios    = kp_col_gpios_sku3,
 	.noutputs       = ARRAY_SIZE(kp_row_gpios_sku3),
 	.ninputs        = ARRAY_SIZE(kp_col_gpios_sku3),
-	.settle_time.tv_nsec = 40 * NSEC_PER_USEC,
-	.poll_time.tv_nsec = 20 * NSEC_PER_MSEC,
+	.settle_time.tv64 = 40 * NSEC_PER_USEC,
+	.poll_time.tv64 = 20 * NSEC_PER_MSEC,
 	.flags          = GPIOKPF_LEVEL_TRIGGERED_IRQ | GPIOKPF_DRIVE_INACTIVE |
 				GPIOKPF_PRINT_UNMAPPED_KEYS,
 };
@@ -1136,6 +1264,30 @@ static struct platform_device pmic_mpp_leds_pdev = {
 	.id     = -1,
 	.dev    = {
 		.platform_data  = &ctp_backlight_pdata,
+	},
+};
+
+static struct led_info tricolor_led_info[] = {
+	[0] = {
+		.name           = "red",
+		.flags          = LED_COLOR_RED,
+	},
+	[1] = {
+		.name           = "green",
+		.flags          = LED_COLOR_GREEN,
+	},
+};
+
+static struct led_platform_data tricolor_led_pdata = {
+	.leds = tricolor_led_info,
+	.num_leds = ARRAY_SIZE(tricolor_led_info),
+};
+
+static struct platform_device tricolor_leds_pdev = {
+	.name   = "msm-tricolor-leds",
+	.id     = -1,
+	.dev    = {
+		.platform_data  = &tricolor_led_pdata,
 	},
 };
 
@@ -1202,6 +1354,7 @@ void __init qrd7627a_add_io_devices(void)
 			mxt_config_array[0].config_length =
 					ARRAY_SIZE(mxt_config_data_evt);
 			mxt_platform_data.panel_maxy = 875;
+			mxt_platform_data.need_calibration = true;
 			mxt_vkey_setup();
 		}
 
@@ -1247,24 +1400,9 @@ void __init qrd7627a_add_io_devices(void)
 		platform_device_register(&kp_pdev_sku3);
 
 	/* leds */
-	if (machine_is_msm7627a_evb() || machine_is_msm8625_evb()) {
-		rc = gpio_tlmm_config(GPIO_CFG(LED_RED_GPIO_8625, 0,
-				GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP,
-				GPIO_CFG_16MA), GPIO_CFG_ENABLE);
-		if (rc) {
-			pr_err("%s: gpio_tlmm_config for %d failed\n",
-				__func__, LED_RED_GPIO_8625);
-		}
-
-		rc = gpio_tlmm_config(GPIO_CFG(LED_GREEN_GPIO_8625, 0,
-				GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP,
-				GPIO_CFG_16MA), GPIO_CFG_ENABLE);
-		if (rc) {
-			pr_err("%s: gpio_tlmm_config for %d failed\n",
-				__func__, LED_GREEN_GPIO_8625);
-		}
-
-		platform_device_register(&gpio_leds_8625);
+	if (machine_is_msm7627a_evb() || machine_is_msm8625_evb() ||
+						machine_is_msm8625_evt()) {
 		platform_device_register(&pmic_mpp_leds_pdev);
+		platform_device_register(&tricolor_leds_pdev);
 	}
 }

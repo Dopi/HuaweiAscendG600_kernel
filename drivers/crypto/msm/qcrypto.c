@@ -12,6 +12,7 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/module.h>
 #include <linux/clk.h>
 #include <linux/types.h>
 #include <linux/platform_device.h>
@@ -888,7 +889,7 @@ static void _qce_aead_complete(void *cookie, unsigned char *icv,
 						ctx->authsize, 1);
 
 			} else {
-				unsigned char tmp[SHA256_DIGESTSIZE];
+				unsigned char tmp[SHA256_DIGESTSIZE] = {0};
 
 				/* compare icv from src */
 				scatterwalk_map_and_copy(tmp,

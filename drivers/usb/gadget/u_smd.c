@@ -488,10 +488,22 @@ static unsigned int convert_acm_sigs_to_uart(unsigned acm_sig)
 	/* should this needs to be in calling functions ??? */
 	acm_sig &= (SMD_ACM_CTRL_DTR | SMD_ACM_CTRL_RTS);
 
+    /* set RTS signal forcedly enven if there is no RTS or DTR */
+    /* always set RTS signal automatically.
+     * If the host does not set RTS signal,
+     * Modem will not write data to share memory.
+     */
+#ifdef CONFIG_HUAWEI_KERNEL
+	if (acm_sig & SMD_ACM_CTRL_DTR)
+		uart_sig |= TIOCM_DTR;
+
+	uart_sig |= TIOCM_RTS;
+#else
 	if (acm_sig & SMD_ACM_CTRL_DTR)
 		uart_sig |= TIOCM_DTR;
 	if (acm_sig & SMD_ACM_CTRL_RTS)
 		uart_sig |= TIOCM_RTS;
+#endif		
 
 	return uart_sig;
 }

@@ -40,6 +40,7 @@
 #include <linux/platform_device.h>
 #include <linux/uaccess.h>
 #include <linux/debugfs.h>
+#include <linux/reboot.h>
 
 #include <asm/byteorder.h>
 
@@ -212,6 +213,26 @@ static DEFINE_MUTEX(xprt_info_list_lock);
 
 DECLARE_COMPLETION(rpc_remote_router_up);
 static atomic_t pending_close_count = ATOMIC_INIT(0);
+
+static int msm_rpc_reboot_call(struct notifier_block *this,
+			unsigned long code, void *_cmd)
+{
+	 switch (code) {
+	 case SYS_RESTART:
+	 case SYS_HALT:
+	 case SYS_POWER_OFF:
+		msm_rpcrouter_close();
+		break;
+	 }
+	 return NOTIFY_DONE;
+}
+
+static struct notifier_block msm_rpc_reboot_notifier = {
+	.notifier_call = msm_rpc_reboot_call,
+	.priority = 100
+};
+
+
 
 /*
  * Search for transport (xprt) that matches the provided PID.
@@ -2446,6 +2467,8 @@ void msm_rpcrouter_xprt_notify(struct rpcrouter_xprt *xprt, unsigned event)
 {
 	struct rpcrouter_xprt_info *xprt_info;
 	struct rpcrouter_xprt_work *xprt_work;
+	/* merge msm kernel 3.4 patch 902de08f6670ddba147609e8b9f895dadf2275d9 */
+	unsigned long flags;
 
 	/* Workqueue is created in init function which works for all existing
 	 * clients.  If this fails in the future, then it will need to be
@@ -2477,11 +2500,14 @@ void msm_rpcrouter_xprt_notify(struct rpcrouter_xprt *xprt, unsigned event)
 
 	xprt_info = xprt->priv;
 	if (xprt_info) {
+		/* merge msm kernel 3.4 patch 902de08f6670ddba147609e8b9f895dadf2275d9 */
+		spin_lock_irqsave(&xprt_info->lock, flags);
 		/* Check read_avail even for OPEN event to handle missed
 		   DATA events while processing the OPEN event*/
 		if (xprt->read_avail() >= xprt_info->need_len)
 			wake_lock(&xprt_info->wakelock);
 		wake_up(&xprt_info->read_wait);
+		spin_unlock_irqrestore(&xprt_info->lock, flags);
 		#ifdef CONFIG_HUAWEI_RPC_CRASH_DEBUG
 		printk(KERN_ERR "%s: Wakeup event - read_avail: %d, need_len %d\n",
 		                  __func__, xprt->read_avail(), xprt_info->need_len);
@@ -2539,7 +2565,9 @@ static int __init rpcrouter_init(void)
 	smd_rpcrouter_debug_mask = 511;
 #endif
 	debugfs_init();
-
+	ret = register_reboot_notifier(&msm_rpc_reboot_notifier);
+	if (ret)
+		pr_err("%s: Failed to register reboot notifier", __func__);
 
 	/* Initialize what we need to start processing */
 	rpcrouter_workqueue =

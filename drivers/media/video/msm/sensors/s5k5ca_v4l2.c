@@ -12,6 +12,7 @@
  */
 
 #include "msm_sensor.h"
+#include <linux/gpio.h>
 #define SENSOR_NAME "s5k5ca"
 #define PLATFORM_DRIVER_NAME "msm_camera_s5k5ca"
 #define s5k5ca_obj s5k5ca_##obj
@@ -2052,18 +2053,18 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x3380},
 	{0x0F12, 0x7000},
 	{0x002A, 0x3380}, // Outdoor CCM
-	{0x0F12, 0x01E0}, //#TVAR_wbt_pOutdoorCcm[0]
-	{0x0F12, 0xFF80}, //#TVAR_wbt_pOutdoorCcm[1]
-	{0x0F12, 0xFFD0}, //#TVAR_wbt_pOutdoorCcm[2]
-	{0x0F12, 0xFF61}, //#TVAR_wbt_pOutdoorCcm[3]
-	{0x0F12, 0x01BD}, //#TVAR_wbt_pOutdoorCcm[4]
-	{0x0F12, 0xFF34}, //#TVAR_wbt_pOutdoorCcm[5]
-	{0x0F12, 0xFFFE}, //#TVAR_wbt_pOutdoorCcm[6]
-	{0x0F12, 0xFFF6}, //#TVAR_wbt_pOutdoorCcm[7]
-	{0x0F12, 0x019D}, //#TVAR_wbt_pOutdoorCcm[8]
-	{0x0F12, 0x0107}, //#TVAR_wbt_pOutdoorCcm[9]
-	{0x0F12, 0x010F}, //#TVAR_wbt_pOutdoorCcm[10]
-	{0x0F12, 0xFF67}, //#TVAR_wbt_pOutdoorCcm[11]
+	{0x0F12, 0x01B9}, //#TVAR_wbt_pOutdoorCcm[0]
+	{0x0F12, 0xFF92}, //#TVAR_wbt_pOutdoorCcm[1]
+	{0x0F12, 0xFFBC}, //#TVAR_wbt_pOutdoorCcm[2]
+	{0x0F12, 0xFF1B}, //#TVAR_wbt_pOutdoorCcm[3]
+	{0x0F12, 0x024B}, //#TVAR_wbt_pOutdoorCcm[4]
+	{0x0F12, 0xFEDF}, //#TVAR_wbt_pOutdoorCcm[5]
+	{0x0F12, 0xFFB9}, //#TVAR_wbt_pOutdoorCcm[6]
+	{0x0F12, 0xFFDB}, //#TVAR_wbt_pOutdoorCcm[7]
+	{0x0F12, 0x01FD}, //#TVAR_wbt_pOutdoorCcm[8]
+	{0x0F12, 0x0091}, //#TVAR_wbt_pOutdoorCcm[9]
+	{0x0F12, 0x00DC}, //#TVAR_wbt_pOutdoorCcm[10]
+	{0x0F12, 0xFF18}, //#TVAR_wbt_pOutdoorCcm[11]
 	{0x0F12, 0x016C}, //#TVAR_wbt_pOutdoorCcm[12]
 	{0x0F12, 0xFF54}, //#TVAR_wbt_pOutdoorCcm[13]
 	{0x0F12, 0x01FC}, //#TVAR_wbt_pOutdoorCcm[14]
@@ -2200,9 +2201,9 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x49D5}, //awbb_CrclLowT_Rad_c
 	{0x0F12, 0x0000},
 	{0x002A, 0x0D46},
-	{0x0F12, 0x03C0}, //awbb_MvEq_RBthresh
+	{0x0F12, 0x0470}, //awbb_MvEq_RBthresh
 	{0x002A, 0x0D5C},
-	{0x0F12, 0x0434}, //awbb_LowTempRB
+	{0x0F12, 0x0534}, //awbb_LowTempRB
 	{0x002A, 0x0D2C},
 	{0x0F12, 0x0131}, //awbb_IntcR
 	{0x0F12, 0x012C}, //awbb_IntcB
@@ -2465,8 +2466,8 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x0064}, //700007EE //TVAR_afit_pBaseValS[21] //AFIT16_YUV422_DENOISE_iUVHighThresh
 	{0x0F12, 0x000A}, //700007F0 //TVAR_afit_pBaseValS[22] //AFIT16_YUV422_DENOISE_iYLowThresh
 	{0x0F12, 0x000A}, //700007F2 //TVAR_afit_pBaseValS[23] //AFIT16_YUV422_DENOISE_iYHighThresh
-	{0x0F12, 0x0032}, //700007F4 //TVAR_afit_pBaseValS[24] //AFIT16_Sharpening_iLowSharpClamp
-	{0x0F12, 0x0012}, //700007F6 //TVAR_afit_pBaseValS[25] //AFIT16_Sharpening_iHighSharpClamp
+	{0x0F12, 0x0028}, //700007F4 //TVAR_afit_pBaseValS[24] //AFIT16_Sharpening_iLowSharpClamp
+	{0x0F12, 0x000F}, //700007F6 //TVAR_afit_pBaseValS[25] //AFIT16_Sharpening_iHighSharpClamp
 	{0x0F12, 0x002A}, //700007F8 //TVAR_afit_pBaseValS[26] //AFIT16_Sharpening_iLowSharpClamp_Bin
 	{0x0F12, 0x0024}, //700007FA //TVAR_afit_pBaseValS[27] //AFIT16_Sharpening_iHighSharpClamp_Bin
 	{0x0F12, 0x002A}, //700007FC //TVAR_afit_pBaseValS[28] //AFIT16_Sharpening_iLowSharpClamp_sBin
@@ -2486,9 +2487,9 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x051E}, //70000818 //TVAR_afit_pBaseValS[42] //AFIT8_Demosaicing_iMonochrom [7:0],	 AFIT8_Demosaicing_iDecisionThresh [15:8]
 	{0x0F12, 0x0A1E}, //7000081A //TVAR_afit_pBaseValS[43] //AFIT8_Demosaicing_iDesatThresh [7:0],   AFIT8_Demosaicing_iEnhThresh [15:8]
 	{0x0F12, 0x0F0F}, //7000081C //TVAR_afit_pBaseValS[44] //AFIT8_Demosaicing_iGRDenoiseVal [7:0],	AFIT8_Demosaicing_iGBDenoiseVal [15:8]
-	{0x0F12, 0x0A03}, //7000081E //TVAR_afit_pBaseValS[45] //AFIT8_Demosaicing_iNearGrayDesat[7:0],	AFIT8_Demosaicing_iDFD_ReduceCoeff [15:8]
-	{0x0F12, 0x0528}, //70000820 //TVAR_afit_pBaseValS[46] //AFIT8_Sharpening_iMSharpen [7:0],   AFIT8_Sharpening_iMShThresh [15:8]
-	{0x0F12, 0x0314}, //70000822 //TVAR_afit_pBaseValS[47] //AFIT8_Sharpening_iWSharpen [7:0],   AFIT8_Sharpening_iWShThresh [15:8]
+	{0x0F12, 0x0A05}, //7000081E //TVAR_afit_pBaseValS[45] //AFIT8_Demosaicing_iNearGrayDesat[7:0],	AFIT8_Demosaicing_iDFD_ReduceCoeff [15:8]
+	{0x0F12, 0x051E}, //70000820 //TVAR_afit_pBaseValS[46] //AFIT8_Sharpening_iMSharpen [7:0],   AFIT8_Sharpening_iMShThresh [15:8]
+	{0x0F12, 0x030F}, //70000822 //TVAR_afit_pBaseValS[47] //AFIT8_Sharpening_iWSharpen [7:0],   AFIT8_Sharpening_iWShThresh [15:8]
 	{0x0F12, 0x0002}, //70000824 //TVAR_afit_pBaseValS[48] //AFIT8_Sharpening_nSharpWidth [7:0],	 AFIT8_Sharpening_iReduceNegative [15:8]
 	{0x0F12, 0x00FF}, //70000826 //TVAR_afit_pBaseValS[49] //AFIT8_Sharpening_iShDespeckle [7:0],  AFIT8_demsharpmix1_iRGBMultiplier [15:8]
 	{0x0F12, 0x1102}, //70000828 //TVAR_afit_pBaseValS[50] //AFIT8_demsharpmix1_iFilterPower [7:0],  AFIT8_demsharpmix1_iBCoeff [15:8]
@@ -2503,16 +2504,16 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x0080}, //7000083A //TVAR_afit_pBaseValS[59] //AFIT8_RGB2YUV_iRGBGain [7:0],   AFIT8_RGB2YUV_iSaturation [15:8]
 	{0x0F12, 0x1414}, //7000083C //TVAR_afit_pBaseValS[60] //AFIT8_sddd8a_iClustThresh_H [7:0],  AFIT8_sddd8a_iClustThresh_C [15:8]
 	{0x0F12, 0x0101}, //7000083E //TVAR_afit_pBaseValS[61] //AFIT8_sddd8a_iClustMulT_H [7:0],   AFIT8_sddd8a_iClustMulT_C [15:8]
-	{0x0F12, 0x5A02}, //70000840 //TVAR_afit_pBaseValS[62] //AFIT8_sddd8a_nClustLevel_H [7:0],   AFIT8_sddd8a_DispTH_Low [15:8]
-	{0x0F12, 0x825A}, //70000842 //TVAR_afit_pBaseValS[63] //AFIT8_sddd8a_DispTH_High [7:0],	 AFIT8_sddd8a_iDenThreshLow [15:8]
+	{0x0F12, 0x6402}, //70000840 //TVAR_afit_pBaseValS[62] //AFIT8_sddd8a_nClustLevel_H [7:0],   AFIT8_sddd8a_DispTH_Low [15:8]
+	{0x0F12, 0x8264}, //70000842 //TVAR_afit_pBaseValS[63] //AFIT8_sddd8a_DispTH_High [7:0],	 AFIT8_sddd8a_iDenThreshLow [15:8]
 	{0x0F12, 0x2882}, //70000844 //TVAR_afit_pBaseValS[64] //AFIT8_sddd8a_iDenThreshHigh[7:0],   AFIT8_Demosaicing_iEdgeDesat [15:8]
 	{0x0F12, 0x0A00}, //70000846 //TVAR_afit_pBaseValS[65] //AFIT8_Demosaicing_iEdgeDesatThrLow [7:0],   AFIT8_Demosaicing_iEdgeDesatThrHigh [15:8]
 	{0x0F12, 0x1403}, //70000848 //TVAR_afit_pBaseValS[66] //AFIT8_Demosaicing_iEdgeDesatLimit[7:0],	AFIT8_Demosaicing_iDemSharpenLow [15:8]
 	{0x0F12, 0x1E0C}, //7000084A //TVAR_afit_pBaseValS[67] //AFIT8_Demosaicing_iDemSharpenHigh[7:0],	 AFIT8_Demosaicing_iDemSharpThresh [15:8]
 	{0x0F12, 0x070A}, //7000084C //TVAR_afit_pBaseValS[68] //AFIT8_Demosaicing_iDemShLowLimit [7:0],	 AFIT8_Demosaicing_iDespeckleForDemsharp [15:8]
 	{0x0F12, 0x32FF}, //7000084E //TVAR_afit_pBaseValS[69] //AFIT8_Demosaicing_iDemBlurLow[7:0],	 AFIT8_Demosaicing_iDemBlurHigh [15:8]
-	{0x0F12, 0x3204}, //70000850 //TVAR_afit_pBaseValS[70] //AFIT8_Demosaicing_iDemBlurRange[7:0],   AFIT8_Sharpening_iLowSharpPower [15:8]
-	{0x0F12, 0x122D}, //70000852 //TVAR_afit_pBaseValS[71] //AFIT8_Sharpening_iHighSharpPower[7:0],	AFIT8_Sharpening_iLowShDenoise [15:8]
+	{0x0F12, 0x2804}, //70000850 //TVAR_afit_pBaseValS[70] //AFIT8_Demosaicing_iDemBlurRange[7:0],   AFIT8_Sharpening_iLowSharpPower [15:8]
+	{0x0F12, 0x1223}, //70000852 //TVAR_afit_pBaseValS[71] //AFIT8_Sharpening_iHighSharpPower[7:0],	AFIT8_Sharpening_iLowShDenoise [15:8]
 	{0x0F12, 0x4012}, //70000854 //TVAR_afit_pBaseValS[72] //AFIT8_Sharpening_iHighShDenoise [7:0],	AFIT8_Sharpening_iReduceEdgeMinMult [15:8]
 	{0x0F12, 0x0204}, //70000856 //TVAR_afit_pBaseValS[73] //AFIT8_Sharpening_iReduceEdgeSlope [7:0],  AFIT8_demsharpmix1_iWideFiltReduce [15:8]
 	{0x0F12, 0x1E03}, //70000858 //TVAR_afit_pBaseValS[74] //AFIT8_demsharpmix1_iNarrFiltReduce [7:0],  AFIT8_sddd8a_iClustThresh_H_Bin [15:8]
@@ -2591,7 +2592,7 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x0A1E}, //700008EA //TVAR_afit_pBaseValS[147] /AFIT8_Demosaicing_iDesatThresh [7:0],   AFIT8_Demosaicing_iEnhThresh [15:8]
 	{0x0F12, 0x0F0F}, //700008EC //TVAR_afit_pBaseValS[148] /AFIT8_Demosaicing_iGRDenoiseVal [7:0],	AFIT8_Demosaicing_iGBDenoiseVal [15:8]
 	{0x0F12, 0x0A03}, //700008EE //TVAR_afit_pBaseValS[149] /AFIT8_Demosaicing_iNearGrayDesat[7:0],	AFIT8_Demosaicing_iDFD_ReduceCoeff [15:8]
-	{0x0F12, 0x052D}, //700008F0 //TVAR_afit_pBaseValS[150] /AFIT8_Sharpening_iMSharpen [7:0],   AFIT8_Sharpening_iMShThresh [15:8]
+	{0x0F12, 0x0528}, //700008F0 //TVAR_afit_pBaseValS[150] /AFIT8_Sharpening_iMSharpen [7:0],   AFIT8_Sharpening_iMShThresh [15:8]
 	{0x0F12, 0x0319}, //700008F2 //TVAR_afit_pBaseValS[151] /AFIT8_Sharpening_iWSharpen [7:0],   AFIT8_Sharpening_iWShThresh [15:8]
 	{0x0F12, 0x0002}, //700008F4 //TVAR_afit_pBaseValS[152] /AFIT8_Sharpening_nSharpWidth [7:0],	 AFIT8_Sharpening_iReduceNegative [15:8]
 	{0x0F12, 0x00FF}, //700008F6 //TVAR_afit_pBaseValS[153] /AFIT8_Sharpening_iShDespeckle [7:0],  AFIT8_demsharpmix1_iRGBMultiplier [15:8]
@@ -2607,8 +2608,8 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x0080}, //7000090A //TVAR_afit_pBaseValS[163] /AFIT8_RGB2YUV_iRGBGain [7:0],   AFIT8_RGB2YUV_iSaturation [15:8]
 	{0x0F12, 0x1919}, //7000090C //TVAR_afit_pBaseValS[164] /AFIT8_sddd8a_iClustThresh_H [7:0],  AFIT8_sddd8a_iClustThresh_C [15:8]
 	{0x0F12, 0x0101}, //7000090E //TVAR_afit_pBaseValS[165] /AFIT8_sddd8a_iClustMulT_H [7:0],   AFIT8_sddd8a_iClustMulT_C [15:8]
-	{0x0F12, 0x4B02}, //70000910 //TVAR_afit_pBaseValS[166] /AFIT8_sddd8a_nClustLevel_H [7:0],   AFIT8_sddd8a_DispTH_Low [15:8]
-	{0x0F12, 0x784B}, //70000912 //TVAR_afit_pBaseValS[167] /AFIT8_sddd8a_DispTH_High [7:0],	 AFIT8_sddd8a_iDenThreshLow [15:8]
+	{0x0F12, 0x5502}, //70000910 //TVAR_afit_pBaseValS[166] /AFIT8_sddd8a_nClustLevel_H [7:0],   AFIT8_sddd8a_DispTH_Low [15:8]
+	{0x0F12, 0x7855}, //70000912 //TVAR_afit_pBaseValS[167] /AFIT8_sddd8a_DispTH_High [7:0],	 AFIT8_sddd8a_iDenThreshLow [15:8]
 	{0x0F12, 0x2878}, //70000914 //TVAR_afit_pBaseValS[168] /AFIT8_sddd8a_iDenThreshHigh[7:0],   AFIT8_Demosaicing_iEdgeDesat [15:8]
 	{0x0F12, 0x0A00}, //70000916 //TVAR_afit_pBaseValS[169] /AFIT8_Demosaicing_iEdgeDesatThrLow [7:0],   AFIT8_Demosaicing_iEdgeDesatThrHigh [15:8]
 	{0x0F12, 0x1403}, //70000918 //TVAR_afit_pBaseValS[170] /AFIT8_Demosaicing_iEdgeDesatLimit[7:0],	AFIT8_Demosaicing_iDemSharpenLow [15:8]
@@ -2695,8 +2696,8 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x0A1E}, //700009BA //TVAR_afit_pBaseValS[251] /AFIT8_Demosaicing_iDesatThresh [7:0],   AFIT8_Demosaicing_iEnhThresh [15:8]
 	{0x0F12, 0x0F0F}, //700009BC //TVAR_afit_pBaseValS[252] /AFIT8_Demosaicing_iGRDenoiseVal [7:0],	AFIT8_Demosaicing_iGBDenoiseVal [15:8]
 	{0x0F12, 0x0A03}, //700009BE //TVAR_afit_pBaseValS[253] /AFIT8_Demosaicing_iNearGrayDesat[7:0],	AFIT8_Demosaicing_iDFD_ReduceCoeff [15:8]
-	{0x0F12, 0x0A32}, //700009C0 //TVAR_afit_pBaseValS[254] /AFIT8_Sharpening_iMSharpen [7:0],   AFIT8_Sharpening_iMShThresh [15:8]
-	{0x0F12, 0x051E}, //700009C2 //TVAR_afit_pBaseValS[255] /AFIT8_Sharpening_iWSharpen [7:0],   AFIT8_Sharpening_iWShThresh [15:8]
+	{0x0F12, 0x0828}, //700009C0 //TVAR_afit_pBaseValS[254] /AFIT8_Sharpening_iMSharpen [7:0],   AFIT8_Sharpening_iMShThresh [15:8]
+	{0x0F12, 0x051C}, //700009C2 //TVAR_afit_pBaseValS[255] /AFIT8_Sharpening_iWSharpen [7:0],   AFIT8_Sharpening_iWShThresh [15:8]
 	{0x0F12, 0x0002}, //700009C4 //TVAR_afit_pBaseValS[256] /AFIT8_Sharpening_nSharpWidth [7:0],	 AFIT8_Sharpening_iReduceNegative [15:8]
 	{0x0F12, 0x00FF}, //700009C6 //TVAR_afit_pBaseValS[257] /AFIT8_Sharpening_iShDespeckle [7:0],  AFIT8_demsharpmix1_iRGBMultiplier [15:8]
 	{0x0F12, 0x1102}, //700009C8 //TVAR_afit_pBaseValS[258] /AFIT8_demsharpmix1_iFilterPower [7:0],  AFIT8_demsharpmix1_iBCoeff [15:8]
@@ -2720,7 +2721,7 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x070A}, //700009EC //TVAR_afit_pBaseValS[276] /AFIT8_Demosaicing_iDemShLowLimit [7:0],	 AFIT8_Demosaicing_iDespeckleForDemsharp [15:8]
 	{0x0F12, 0x32FF}, //700009EE //TVAR_afit_pBaseValS[277] /AFIT8_Demosaicing_iDemBlurLow[7:0],	 AFIT8_Demosaicing_iDemBlurHigh [15:8]
 	{0x0F12, 0x4B04}, //700009F0 //TVAR_afit_pBaseValS[278] /AFIT8_Demosaicing_iDemBlurRange[7:0],   AFIT8_Sharpening_iLowSharpPower [15:8]
-	{0x0F12, 0x0F3C}, //700009F2 //TVAR_afit_pBaseValS[279] /AFIT8_Sharpening_iHighSharpPower[7:0],	AFIT8_Sharpening_iLowShDenoise [15:8]
+	{0x0F12, 0x143C}, //700009F2 //TVAR_afit_pBaseValS[279] /AFIT8_Sharpening_iHighSharpPower[7:0],	AFIT8_Sharpening_iLowShDenoise [15:8]
 	{0x0F12, 0x400F}, //700009F4 //TVAR_afit_pBaseValS[280] /AFIT8_Sharpening_iHighShDenoise [7:0],	AFIT8_Sharpening_iReduceEdgeMinMult [15:8]
 	{0x0F12, 0x0204}, //700009F6 //TVAR_afit_pBaseValS[281] /AFIT8_Sharpening_iReduceEdgeSlope [7:0],  AFIT8_demsharpmix1_iWideFiltReduce [15:8]
 	{0x0F12, 0x2303}, //700009F8 //TVAR_afit_pBaseValS[282] /AFIT8_demsharpmix1_iNarrFiltReduce [7:0],  AFIT8_sddd8a_iClustThresh_H_Bin [15:8]
@@ -2755,7 +2756,7 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x0003}, //70000A32 //TVAR_afit_pBaseValS[311] /AFIT8_demsharpmix1_iNarrFiltReduce_sBin [7:0]
 	{0x0F12, 0x0000}, //70000A34 //TVAR_afit_pBaseValS[312] /AFIT16_BRIGHTNESS
 	{0x0F12, 0x0000}, //70000A36 //TVAR_afit_pBaseValS[313] /AFIT16_CONTRAST
-	{0x0F12, 0x0014}, //70000A38 //TVAR_afit_pBaseValS[314] /AFIT16_SATURATION
+	{0x0F12, 0x0019}, //70000A38 //TVAR_afit_pBaseValS[314] /AFIT16_SATURATION
 	{0x0F12, 0x0000}, //70000A3A //TVAR_afit_pBaseValS[315] /AFIT16_SHARP_BLUR
 	{0x0F12, 0x0000}, //70000A3C //TVAR_afit_pBaseValS[316] /AFIT16_GLAMOUR
 	{0x0F12, 0x00C4}, //70000A3E //TVAR_afit_pBaseValS[317] /AFIT16_sddd8a_edge_high
@@ -2777,8 +2778,8 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x001E}, //70000A5E //TVAR_afit_pBaseValS[333] /AFIT16_YUV422_DENOISE_iUVHighThresh
 	{0x0F12, 0x000A}, //70000A60 //TVAR_afit_pBaseValS[334] /AFIT16_YUV422_DENOISE_iYLowThresh
 	{0x0F12, 0x000A}, //70000A62 //TVAR_afit_pBaseValS[335] /AFIT16_YUV422_DENOISE_iYHighThresh
-	{0x0F12, 0x00E6}, //70000A64 //TVAR_afit_pBaseValS[336] /AFIT16_Sharpening_iLowSharpClamp
-	{0x0F12, 0x001E}, //70000A66 //TVAR_afit_pBaseValS[337] /AFIT16_Sharpening_iHighSharpClamp
+	{0x0F12, 0x00C8}, //70000A64 //TVAR_afit_pBaseValS[336] /AFIT16_Sharpening_iLowSharpClamp
+	{0x0F12, 0x0014}, //70000A66 //TVAR_afit_pBaseValS[337] /AFIT16_Sharpening_iHighSharpClamp
 	{0x0F12, 0x0032}, //70000A68 //TVAR_afit_pBaseValS[338] /AFIT16_Sharpening_iLowSharpClamp_Bin
 	{0x0F12, 0x0028}, //70000A6A //TVAR_afit_pBaseValS[339] /AFIT16_Sharpening_iHighSharpClamp_Bin
 	{0x0F12, 0x0032}, //70000A6C //TVAR_afit_pBaseValS[340] /AFIT16_Sharpening_iLowSharpClamp_sBin
@@ -2798,9 +2799,9 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x051E}, //70000A88 //TVAR_afit_pBaseValS[354] /AFIT8_Demosaicing_iMonochrom [7:0],	 AFIT8_Demosaicing_iDecisionThresh [15:8]
 	{0x0F12, 0x0A1E}, //70000A8A //TVAR_afit_pBaseValS[355] /AFIT8_Demosaicing_iDesatThresh [7:0],   AFIT8_Demosaicing_iEnhThresh [15:8]
 	{0x0F12, 0x0F0F}, //70000A8C //TVAR_afit_pBaseValS[356] /AFIT8_Demosaicing_iGRDenoiseVal [7:0],	AFIT8_Demosaicing_iGBDenoiseVal [15:8]
-	{0x0F12, 0x0A03}, //70000A8E //TVAR_afit_pBaseValS[357] /AFIT8_Demosaicing_iNearGrayDesat[7:0],	AFIT8_Demosaicing_iDFD_ReduceCoeff [15:8]
-	{0x0F12, 0x0A32}, //70000A90 //TVAR_afit_pBaseValS[358] /AFIT8_Sharpening_iMSharpen [7:0],   AFIT8_Sharpening_iMShThresh [15:8]
-	{0x0F12, 0x051E}, //70000A92 //TVAR_afit_pBaseValS[359] /AFIT8_Sharpening_iWSharpen [7:0],   AFIT8_Sharpening_iWShThresh [15:8]
+	{0x0F12, 0x0A04}, //70000A8E //TVAR_afit_pBaseValS[357] /AFIT8_Demosaicing_iNearGrayDesat[7:0],	AFIT8_Demosaicing_iDFD_ReduceCoeff [15:8]
+	{0x0F12, 0x0828}, //70000A90 //TVAR_afit_pBaseValS[358] /AFIT8_Sharpening_iMSharpen [7:0],   AFIT8_Sharpening_iMShThresh [15:8]
+	{0x0F12, 0x051C}, //70000A92 //TVAR_afit_pBaseValS[359] /AFIT8_Sharpening_iWSharpen [7:0],   AFIT8_Sharpening_iWShThresh [15:8]
 	{0x0F12, 0x0002}, //70000A94 //TVAR_afit_pBaseValS[360] /AFIT8_Sharpening_nSharpWidth [7:0],	 AFIT8_Sharpening_iReduceNegative [15:8]
 	{0x0F12, 0x00FF}, //70000A96 //TVAR_afit_pBaseValS[361] /AFIT8_Sharpening_iShDespeckle [7:0],  AFIT8_demsharpmix1_iRGBMultiplier [15:8]
 	{0x0F12, 0x1002}, //70000A98 //TVAR_afit_pBaseValS[362] /AFIT8_demsharpmix1_iFilterPower [7:0],  AFIT8_demsharpmix1_iBCoeff [15:8]
@@ -2816,16 +2817,16 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x2328}, //70000AAC //TVAR_afit_pBaseValS[372] /AFIT8_sddd8a_iClustThresh_H [7:0],  AFIT8_sddd8a_iClustThresh_C [15:8]
 	{0x0F12, 0x0101}, //70000AAE //TVAR_afit_pBaseValS[373] /AFIT8_sddd8a_iClustMulT_H [7:0],   AFIT8_sddd8a_iClustMulT_C [15:8]
 	{0x0F12, 0x2A02}, //70000AB0 //TVAR_afit_pBaseValS[374] /AFIT8_sddd8a_nClustLevel_H [7:0],   AFIT8_sddd8a_DispTH_Low [15:8]
-	{0x0F12, 0x2228}, //70000AB2 //TVAR_afit_pBaseValS[375] /AFIT8_sddd8a_DispTH_High [7:0],	 AFIT8_sddd8a_iDenThreshLow [15:8]
-	{0x0F12, 0x2822}, //70000AB4 //TVAR_afit_pBaseValS[376] /AFIT8_sddd8a_iDenThreshHigh[7:0],   AFIT8_Demosaicing_iEdgeDesat [15:8]
+	{0x0F12, 0x2828}, //70000AB2 //TVAR_afit_pBaseValS[375] /AFIT8_sddd8a_DispTH_High [7:0],	 AFIT8_sddd8a_iDenThreshLow [15:8]
+	{0x0F12, 0x2828}, //70000AB4 //TVAR_afit_pBaseValS[376] /AFIT8_sddd8a_iDenThreshHigh[7:0],   AFIT8_Demosaicing_iEdgeDesat [15:8]
 	{0x0F12, 0x0A00}, //70000AB6 //TVAR_afit_pBaseValS[377] /AFIT8_Demosaicing_iEdgeDesatThrLow [7:0],   AFIT8_Demosaicing_iEdgeDesatThrHigh [15:8]
 	{0x0F12, 0x1903}, //70000AB8 //TVAR_afit_pBaseValS[378] /AFIT8_Demosaicing_iEdgeDesatLimit[7:0],	AFIT8_Demosaicing_iDemSharpenLow [15:8]
 	{0x0F12, 0x1E0F}, //70000ABA //TVAR_afit_pBaseValS[379] /AFIT8_Demosaicing_iDemSharpenHigh[7:0],	 AFIT8_Demosaicing_iDemSharpThresh [15:8]
 	{0x0F12, 0x070A}, //70000ABC //TVAR_afit_pBaseValS[380] /AFIT8_Demosaicing_iDemShLowLimit [7:0],	 AFIT8_Demosaicing_iDespeckleForDemsharp [15:8]
 	{0x0F12, 0x32FF}, //70000ABE //TVAR_afit_pBaseValS[381] /AFIT8_Demosaicing_iDemBlurLow[7:0],	 AFIT8_Demosaicing_iDemBlurHigh [15:8]
-	{0x0F12, 0x7804}, //70000AC0 //TVAR_afit_pBaseValS[382] /AFIT8_Demosaicing_iDemBlurRange[7:0],   AFIT8_Sharpening_iLowSharpPower [15:8]
-	{0x0F12, 0x0F3C}, //70000AC2 //TVAR_afit_pBaseValS[383] /AFIT8_Sharpening_iHighSharpPower[7:0],	AFIT8_Sharpening_iLowShDenoise [15:8]
-	{0x0F12, 0x400F}, //70000AC4 //TVAR_afit_pBaseValS[384] /AFIT8_Sharpening_iHighShDenoise [7:0],	AFIT8_Sharpening_iReduceEdgeMinMult [15:8]
+	{0x0F12, 0x6E04}, //70000AC0 //TVAR_afit_pBaseValS[382] /AFIT8_Demosaicing_iDemBlurRange[7:0],   AFIT8_Sharpening_iLowSharpPower [15:8]
+	{0x0F12, 0x143C}, //70000AC2 //TVAR_afit_pBaseValS[383] /AFIT8_Sharpening_iHighSharpPower[7:0],	AFIT8_Sharpening_iLowShDenoise [15:8]
+	{0x0F12, 0x4019}, //70000AC4 //TVAR_afit_pBaseValS[384] /AFIT8_Sharpening_iHighShDenoise [7:0],	AFIT8_Sharpening_iReduceEdgeMinMult [15:8]
 	{0x0F12, 0x0504}, //70000AC6 //TVAR_afit_pBaseValS[385] /AFIT8_Sharpening_iReduceEdgeSlope [7:0],  AFIT8_demsharpmix1_iWideFiltReduce [15:8]
 	{0x0F12, 0x2805}, //70000AC8 //TVAR_afit_pBaseValS[386] /AFIT8_demsharpmix1_iNarrFiltReduce [7:0],  AFIT8_sddd8a_iClustThresh_H_Bin [15:8]
 	{0x0F12, 0x0123}, //70000ACA //TVAR_afit_pBaseValS[387] /AFIT8_sddd8a_iClustThresh_C_Bin [7:0],	AFIT8_sddd8a_iClustMulT_H_Bin [15:8]
@@ -2859,7 +2860,7 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x0003}, //70000B02 //TVAR_afit_pBaseValS[415] /AFIT8_demsharpmix1_iNarrFiltReduce_sBin [7:0]
 	{0x0F12, 0x0000}, //70000B04 //TVAR_afit_pBaseValS[416] /AFIT16_BRIGHTNESS
 	{0x0F12, 0x0000}, //70000B06 //TVAR_afit_pBaseValS[417] /AFIT16_CONTRAST
-	{0x0F12, 0x0014}, //70000B08 //TVAR_afit_pBaseValS[418] /AFIT16_SATURATION
+	{0x0F12, 0x0019}, //70000B08 //TVAR_afit_pBaseValS[418] /AFIT16_SATURATION
 	{0x0F12, 0x0000}, //70000B0A //TVAR_afit_pBaseValS[419] /AFIT16_SHARP_BLUR
 	{0x0F12, 0x0000}, //70000B0C //TVAR_afit_pBaseValS[420] /AFIT16_GLAMOUR
 	{0x0F12, 0x00C4}, //70000B0E //TVAR_afit_pBaseValS[421] /AFIT16_sddd8a_edge_high
@@ -2881,8 +2882,8 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x0014}, //70000B2E //TVAR_afit_pBaseValS[437] /AFIT16_YUV422_DENOISE_iUVHighThresh
 	{0x0F12, 0x000A}, //70000B30 //TVAR_afit_pBaseValS[438] /AFIT16_YUV422_DENOISE_iYLowThresh
 	{0x0F12, 0x000A}, //70000B32 //TVAR_afit_pBaseValS[439] /AFIT16_YUV422_DENOISE_iYHighThresh
-	{0x0F12, 0x010E}, //70000B34 //TVAR_afit_pBaseValS[440] /AFIT16_Sharpening_iLowSharpClamp
-	{0x0F12, 0x002D}, //70000B36 //TVAR_afit_pBaseValS[441] /AFIT16_Sharpening_iHighSharpClamp
+	{0x0F12, 0x00DC}, //70000B34 //TVAR_afit_pBaseValS[440] /AFIT16_Sharpening_iLowSharpClamp
+	{0x0F12, 0x0023}, //70000B36 //TVAR_afit_pBaseValS[441] /AFIT16_Sharpening_iHighSharpClamp
 	{0x0F12, 0x0032}, //70000B38 //TVAR_afit_pBaseValS[442] /AFIT16_Sharpening_iLowSharpClamp_Bin
 	{0x0F12, 0x0023}, //70000B3A //TVAR_afit_pBaseValS[443] /AFIT16_Sharpening_iHighSharpClamp_Bin
 	{0x0F12, 0x0023}, //70000B3C //TVAR_afit_pBaseValS[444] /AFIT16_Sharpening_iLowSharpClamp_sBin
@@ -2902,9 +2903,9 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x051E}, //70000B58 //TVAR_afit_pBaseValS[458] /AFIT8_Demosaicing_iMonochrom [7:0],	 AFIT8_Demosaicing_iDecisionThresh [15:8]
 	{0x0F12, 0x0A1E}, //70000B5A //TVAR_afit_pBaseValS[459] /AFIT8_Demosaicing_iDesatThresh [7:0],   AFIT8_Demosaicing_iEnhThresh [15:8]
 	{0x0F12, 0x0000}, //70000B5C //TVAR_afit_pBaseValS[460] /AFIT8_Demosaicing_iGRDenoiseVal [7:0],	AFIT8_Demosaicing_iGBDenoiseVal [15:8]
-	{0x0F12, 0x0A03}, //70000B5E //TVAR_afit_pBaseValS[461] /AFIT8_Demosaicing_iNearGrayDesat[7:0],	AFIT8_Demosaicing_iDFD_ReduceCoeff [15:8]
-	{0x0F12, 0x0A32}, //70000B60 //TVAR_afit_pBaseValS[462] /AFIT8_Sharpening_iMSharpen [7:0],   AFIT8_Sharpening_iMShThresh [15:8]
-	{0x0F12, 0x0523}, //70000B62 //TVAR_afit_pBaseValS[463] /AFIT8_Sharpening_iWSharpen [7:0],   AFIT8_Sharpening_iWShThresh [15:8]
+	{0x0F12, 0x0A05}, //70000B5E //TVAR_afit_pBaseValS[461] /AFIT8_Demosaicing_iNearGrayDesat[7:0],	AFIT8_Demosaicing_iDFD_ReduceCoeff [15:8]
+	{0x0F12, 0x0828}, //70000B60 //TVAR_afit_pBaseValS[462] /AFIT8_Sharpening_iMSharpen [7:0],   AFIT8_Sharpening_iMShThresh [15:8]
+	{0x0F12, 0x051C}, //70000B62 //TVAR_afit_pBaseValS[463] /AFIT8_Sharpening_iWSharpen [7:0],   AFIT8_Sharpening_iWShThresh [15:8]
 	{0x0F12, 0x0002}, //70000B64 //TVAR_afit_pBaseValS[464] /AFIT8_Sharpening_nSharpWidth [7:0],	 AFIT8_Sharpening_iReduceNegative [15:8]
 	{0x0F12, 0x0096}, //70000B66 //TVAR_afit_pBaseValS[465] /AFIT8_Sharpening_iShDespeckle [7:0],  AFIT8_demsharpmix1_iRGBMultiplier [15:8]
 	{0x0F12, 0x1002}, //70000B68 //TVAR_afit_pBaseValS[466] /AFIT8_demsharpmix1_iFilterPower [7:0],  AFIT8_demsharpmix1_iBCoeff [15:8]
@@ -2919,17 +2920,17 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	{0x0F12, 0x0080}, //70000B7A //TVAR_afit_pBaseValS[475] /AFIT8_RGB2YUV_iRGBGain [7:0],   AFIT8_RGB2YUV_iSaturation [15:8]
 	{0x0F12, 0x5050}, //70000B7C //TVAR_afit_pBaseValS[476] /AFIT8_sddd8a_iClustThresh_H [7:0],  AFIT8_sddd8a_iClustThresh_C [15:8]
 	{0x0F12, 0x0101}, //70000B7E //TVAR_afit_pBaseValS[477] /AFIT8_sddd8a_iClustMulT_H [7:0],   AFIT8_sddd8a_iClustMulT_C [15:8]
-	{0x0F12, 0x1C02}, //70000B80 //TVAR_afit_pBaseValS[478] /AFIT8_sddd8a_nClustLevel_H [7:0],   AFIT8_sddd8a_DispTH_Low [15:8]
-	{0x0F12, 0x191C}, //70000B82 //TVAR_afit_pBaseValS[479] /AFIT8_sddd8a_DispTH_High [7:0],	 AFIT8_sddd8a_iDenThreshLow [15:8]
-	{0x0F12, 0x2819}, //70000B84 //TVAR_afit_pBaseValS[480] /AFIT8_sddd8a_iDenThreshHigh[7:0],   AFIT8_Demosaicing_iEdgeDesat [15:8]
+	{0x0F12, 0x2602}, //70000B80 //TVAR_afit_pBaseValS[478] /AFIT8_sddd8a_nClustLevel_H [7:0],   AFIT8_sddd8a_DispTH_Low [15:8]
+	{0x0F12, 0x2326}, //70000B82 //TVAR_afit_pBaseValS[479] /AFIT8_sddd8a_DispTH_High [7:0],	 AFIT8_sddd8a_iDenThreshLow [15:8]
+	{0x0F12, 0x2823}, //70000B84 //TVAR_afit_pBaseValS[480] /AFIT8_sddd8a_iDenThreshHigh[7:0],   AFIT8_Demosaicing_iEdgeDesat [15:8]
 	{0x0F12, 0x0A00}, //70000B86 //TVAR_afit_pBaseValS[481] /AFIT8_Demosaicing_iEdgeDesatThrLow [7:0],   AFIT8_Demosaicing_iEdgeDesatThrHigh [15:8]
 	{0x0F12, 0x1E03}, //70000B88 //TVAR_afit_pBaseValS[482] /AFIT8_Demosaicing_iEdgeDesatLimit[7:0],	AFIT8_Demosaicing_iDemSharpenLow [15:8]
 	{0x0F12, 0x1E0F}, //70000B8A //TVAR_afit_pBaseValS[483] /AFIT8_Demosaicing_iDemSharpenHigh[7:0],	 AFIT8_Demosaicing_iDemSharpThresh [15:8]
 	{0x0F12, 0x0508}, //70000B8C //TVAR_afit_pBaseValS[484] /AFIT8_Demosaicing_iDemShLowLimit [7:0],	 AFIT8_Demosaicing_iDespeckleForDemsharp [15:8]
 	{0x0F12, 0x32FF}, //70000B8E //TVAR_afit_pBaseValS[485] /AFIT8_Demosaicing_iDemBlurLow[7:0],	 AFIT8_Demosaicing_iDemBlurHigh [15:8]
-	{0x0F12, 0x8C04}, //70000B90 //TVAR_afit_pBaseValS[486] /AFIT8_Demosaicing_iDemBlurRange[7:0],   AFIT8_Sharpening_iLowSharpPower [15:8]
-	{0x0F12, 0x1446}, //70000B92 //TVAR_afit_pBaseValS[487] /AFIT8_Sharpening_iHighSharpPower[7:0],	AFIT8_Sharpening_iLowShDenoise [15:8]
-	{0x0F12, 0x4015}, //70000B94 //TVAR_afit_pBaseValS[488] /AFIT8_Sharpening_iHighShDenoise [7:0],	AFIT8_Sharpening_iReduceEdgeMinMult [15:8]
+	{0x0F12, 0x7804}, //70000B90 //TVAR_afit_pBaseValS[486] /AFIT8_Demosaicing_iDemBlurRange[7:0],   AFIT8_Sharpening_iLowSharpPower [15:8]
+	{0x0F12, 0x1E41}, //70000B92 //TVAR_afit_pBaseValS[487] /AFIT8_Sharpening_iHighSharpPower[7:0],	AFIT8_Sharpening_iLowShDenoise [15:8]
+	{0x0F12, 0x401E}, //70000B94 //TVAR_afit_pBaseValS[488] /AFIT8_Sharpening_iHighShDenoise [7:0],	AFIT8_Sharpening_iReduceEdgeMinMult [15:8]
 	{0x0F12, 0x0604}, //70000B96 //TVAR_afit_pBaseValS[489] /AFIT8_Sharpening_iReduceEdgeSlope [7:0],  AFIT8_demsharpmix1_iWideFiltReduce [15:8]
 	{0x0F12, 0x5006}, //70000B98 //TVAR_afit_pBaseValS[490] /AFIT8_demsharpmix1_iNarrFiltReduce [7:0],  AFIT8_sddd8a_iClustThresh_H_Bin [15:8]
 	{0x0F12, 0x0150}, //70000B9A //TVAR_afit_pBaseValS[491] /AFIT8_sddd8a_iClustThresh_C_Bin [7:0],	AFIT8_sddd8a_iClustMulT_H_Bin [15:8]
@@ -3007,7 +3008,7 @@ static struct msm_camera_i2c_reg_conf s5k5ca_recommend_settings_2[] = {
 	//===============================================================================================
 	//Set input CLK // 26MHz
 	{0x002A, 0x01CC},
-	{0x0F12, 0x5DC0}, //5FB4 // #REG_TC_IPRM_InClockLSBs  //Set input CLK // 24MHz
+	{0x0F12, 0xBB80}, //5FB4 // #REG_TC_IPRM_InClockLSBs  //Set input CLK // 24MHz
 	{0x0F12, 0x0000}, // #REG_TC_IPRM_InClockMSBs
 
 	{0x002A, 0x01EE},
@@ -3307,7 +3308,6 @@ static struct msm_camera_i2c_reg_conf s5k5ca_effect_aqua_reg_config[] =
 	{0x0F12, 0x0300}, //B_gain
 	{0x0F12, 0x0001},
 };
-
 static struct msm_camera_i2c_reg_conf s5k5ca_mirror_flip_reg_config[] =
 {
     {0x0028, 0x7000},
@@ -3319,10 +3319,9 @@ static struct msm_camera_i2c_reg_conf s5k5ca_mirror_flip_reg_config[] =
     {0x002A, 0x0246}, //REG_TC_GP_CapConfigChanged
     {0x0F12, 0x0001},
 };
-
 static struct v4l2_subdev_info s5k5ca_subdev_info[] = {
 	{
-	.code   = V4L2_MBUS_FMT_SGRBG10_1X10,
+	.code   = V4L2_MBUS_FMT_YUYV8_2X8,
 	.colorspace = V4L2_COLORSPACE_JPEG,
 	.fmt    = 1,
 	.order    = 0,
@@ -3397,10 +3396,12 @@ static int32_t s5k5ca_write_pict_exp_gain(struct msm_sensor_ctrl_t *s_ctrl,
 	return 0;
 }
 
+/*Change the func so when match id fails for first time , we will reset REST and PWDN to read again*/
 int32_t s5k5ca_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 {
 	int32_t rc = 0;
 	uint16_t chipid = 0;
+	static bool probe_first = TRUE;
 
 	/* the 4 registers will reset the sensor */
     if(false == s_ctrl->sensordata->standby_is_supported 
@@ -3413,7 +3414,6 @@ int32_t s5k5ca_match_id(struct msm_sensor_ctrl_t *s_ctrl)
     	if(rc < 0)
     	{
     		printk("s5k5ca failed to write register to read chipid !\n");
-    		return rc;
     	}
     	
     	rc = msm_camera_i2c_read(
@@ -3423,14 +3423,33 @@ int32_t s5k5ca_match_id(struct msm_sensor_ctrl_t *s_ctrl)
     	if (rc < 0) {
     		pr_err("%s: %s: read id failed\n", __func__,
     			s_ctrl->sensordata->sensor_name);
-    		return rc;
     	}
 
     	CDBG("msm_sensor id: %d\n", chipid);
     	if (chipid != s_ctrl->sensor_id_info->sensor_id) {
     		pr_err("s5k5ca_match_id chip id doesnot match\n");
-    		return -ENODEV;
+    		rc = -ENODEV;
     	}
+	printk("rc =%d\n", rc);
+	if((TRUE == probe_first) && (rc < 0))
+	{
+		probe_first = FALSE;
+		printk("s5k5ca: to reset pwdn and reset to probe again![BEGIN]\n");
+		printk("s5k5ca: config  reset  to low!\n");
+		gpio_set_value_cansleep(49,GPIOF_OUT_INIT_LOW);
+		msleep(20);
+		printk("s5k5ca: config  pwdn  to high!\n");
+		gpio_set_value_cansleep(119,GPIOF_OUT_INIT_HIGH);
+		msleep(100);
+		printk("s5k5ca: config  pwdn  to low!\n");
+		gpio_set_value_cansleep(119,GPIOF_OUT_INIT_LOW);
+		msleep(20);
+		printk("s5k5ca: config  reset  to high!\n");
+		gpio_set_value_cansleep(49,GPIOF_OUT_INIT_HIGH);
+		msleep(50);
+		rc = s5k5ca_match_id(s_ctrl);
+		printk("s5k5ca: to reset pwdn and reset to probe again![END]\n");
+	}
     }
     else
         rc = 0;
@@ -3533,13 +3552,105 @@ int32_t s5k5ca_sensor_set_effect(struct msm_sensor_ctrl_t *s_ctrl, int effect)
 	effect_current = effect ;
 	return rc;
 }
+int32_t s5k5ca_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
+{
+	int32_t rc = 0;
+	static struct msm_cam_clk_info clk_info[] = {
+	{"cam_clk", MSM_SENSOR_MCLK_24HZ},
+	};
+	struct msm_camera_sensor_info *data = s_ctrl->sensordata;
+	CDBG("%s: %d\n", __func__, __LINE__);
+	s_ctrl->reg_ptr = kzalloc(sizeof(struct regulator *)
+			* data->sensor_platform_info->num_vreg, GFP_KERNEL);
+	if (!s_ctrl->reg_ptr) {
+		pr_err("%s: could not allocate mem for regulators\n",
+			__func__);
+		return -ENOMEM;
+	}
 
+	rc = msm_camera_request_gpio_table(data, 1);
+	if (rc < 0) {
+		pr_err("%s: request gpio failed\n", __func__);
+		goto request_gpio_failed;
+	}
+    if(data->standby_is_supported)
+    {
+        csi_config = 0;
+    }
+    if (s_ctrl->clk_rate != 0)
+	clk_info->clk_rate = s_ctrl->clk_rate;
+
+    rc = msm_cam_clk_enable(&s_ctrl->sensor_i2c_client->client->dev,
+	clk_info, &s_ctrl->cam_clk, ARRAY_SIZE(clk_info), 1);
+    if (rc < 0) {
+	pr_err("%s: clk enable failed\n", __func__);
+	goto enable_clk_failed;
+    }
+    usleep_range(100*1000, 105*1000);
+    /* power up one time in standby mode */
+    if((false == data->standby_is_supported) 
+        || (0 == strcmp(data->sensor_name, ""))
+        || (false == standby_mode))
+    {
+    	rc = msm_camera_config_vreg(&s_ctrl->sensor_i2c_client->client->dev,
+    			s_ctrl->sensordata->sensor_platform_info->cam_vreg,
+    			s_ctrl->sensordata->sensor_platform_info->num_vreg,
+    			s_ctrl->reg_ptr, 1);
+    	if (rc < 0) {
+    		pr_err("%s: regulator on failed\n", __func__);
+    		goto config_vreg_failed;
+    	}
+
+    	rc = msm_camera_enable_vreg(&s_ctrl->sensor_i2c_client->client->dev,
+    			s_ctrl->sensordata->sensor_platform_info->cam_vreg,
+    			s_ctrl->sensordata->sensor_platform_info->num_vreg,
+    			s_ctrl->reg_ptr, 1);
+    	if (rc < 0) {
+    		pr_err("%s: enable regulator failed\n", __func__);
+    		goto enable_vreg_failed;
+    	}
+    }
+	usleep_range(20*1000, 25*1000);	
+	rc = msm_camera_config_gpio_table(data, 1);
+	if (rc < 0) {
+		pr_err("%s: config gpio failed\n", __func__);
+		goto config_gpio_failed;
+	}
+	usleep_range(15000, 16000);
+	if (data->sensor_platform_info->ext_power_ctrl != NULL)
+		data->sensor_platform_info->ext_power_ctrl(1);
+
+	if (data->sensor_platform_info->i2c_conf &&
+		data->sensor_platform_info->i2c_conf->use_i2c_mux)
+		msm_sensor_enable_i2c_mux(data->sensor_platform_info->i2c_conf);
+
+	return rc;
+
+config_gpio_failed:
+	msm_camera_enable_vreg(&s_ctrl->sensor_i2c_client->client->dev,
+			s_ctrl->sensordata->sensor_platform_info->cam_vreg,
+			s_ctrl->sensordata->sensor_platform_info->num_vreg,
+			s_ctrl->reg_ptr, 0);
+enable_vreg_failed:
+	msm_camera_config_vreg(&s_ctrl->sensor_i2c_client->client->dev,
+		s_ctrl->sensordata->sensor_platform_info->cam_vreg,
+		s_ctrl->sensordata->sensor_platform_info->num_vreg,
+		s_ctrl->reg_ptr, 0);
+config_vreg_failed:
+	msm_cam_clk_enable(&s_ctrl->sensor_i2c_client->client->dev,
+		clk_info, &s_ctrl->cam_clk, ARRAY_SIZE(clk_info), 0);	
+enable_clk_failed:
+	msm_camera_request_gpio_table(data, 0);
+request_gpio_failed:
+	kfree(s_ctrl->reg_ptr);
+	return rc;
+}
 int32_t s5k5ca_set_mirror_mode(struct msm_sensor_ctrl_t *s_ctrl)
 {
 	int32_t rc=0;
 	
 	/*if needed, write the mirror registers*/
-	if (HW_MIRROR_AND_FLIP == get_hw_camera_mirror_type()) 
+	if (HW_MIRROR_AND_FLIP == (get_hw_camera_mirror_type() & HW_MIRROR_AND_FLIP))
 	{
 		printk("%s: camera need to mirror and flip here!\n", __func__);
 		rc = msm_camera_i2c_write_tbl(
@@ -3571,7 +3682,6 @@ int32_t s5k5ca_write_init_settings(struct msm_sensor_ctrl_t *s_ctrl)
 
 	return rc;
 }
-
 static const struct i2c_device_id s5k5ca_i2c_id[] = {
 	{SENSOR_NAME, (kernel_ulong_t)&s5k5ca_s_ctrl},
 	{ }
@@ -3622,7 +3732,7 @@ static struct msm_sensor_fn_t s5k5ca_func_tbl = {
 	.sensor_mode_init = msm_sensor_mode_init,
 	.sensor_get_output_info = msm_sensor_get_output_info,
 	.sensor_config = msm_sensor_config,
-	.sensor_power_up = msm_sensor_power_up,
+	.sensor_power_up = s5k5ca_sensor_power_up,
 	.sensor_power_down = msm_sensor_power_down,
 	.sensor_match_id = s5k5ca_match_id,
 	.sensor_set_wb = s5k5ca_sensor_set_wb,
@@ -3656,7 +3766,7 @@ static struct msm_sensor_ctrl_t s5k5ca_s_ctrl = {
 	.sensor_v4l2_subdev_info_size = ARRAY_SIZE(s5k5ca_subdev_info),
 	.sensor_v4l2_subdev_ops = &s5k5ca_subdev_ops,
 	.func_tbl = &s5k5ca_func_tbl,
-	.clk_rate = MSM_SENSOR_MCLK_24HZ,
+	.clk_rate = MSM_SENSOR_MCLK_48HZ,
 	.sensor_name = "23060073FF-SAM-S",
 };
 

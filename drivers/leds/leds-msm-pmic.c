@@ -20,6 +20,7 @@
 #include <mach/pmic.h>
 #include <mach/rpc_pmapp.h>
 
+#include <linux/module.h>
 #ifdef CONFIG_HUAWEI_LEDS_PMIC
 #include <linux/mfd/pmic8058.h>
 #include <mach/gpio.h>
@@ -221,6 +222,7 @@ static int msm_pmic_led_suspend(struct platform_device *dev,
     }
 #endif
 	led_classdev_suspend(&msm_kp_bl_led);
+
 	return 0;
 }
 

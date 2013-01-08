@@ -429,69 +429,68 @@ int msm_camera_config_gpio_table(struct msm_camera_sensor_info *sinfo,
 
 	if (gpio_en) {
 		for (i = 0; i < gpio_conf->cam_gpio_set_tbl_size; i++) {
-            if((false == sinfo->standby_is_supported) || (0 == strcmp(sinfo->sensor_name, "")))
-            {
-    			gpio_set_value_cansleep(
-    				gpio_conf->cam_gpio_set_tbl[i].gpio,
-    				gpio_conf->cam_gpio_set_tbl[i].flags);
-    			usleep_range(gpio_conf->cam_gpio_set_tbl[i].delay,
-    				gpio_conf->cam_gpio_set_tbl[i].delay + 1000);
-            }
+			if((false == sinfo->standby_is_supported) || (0 == strcmp(sinfo->sensor_name, "")))
+			{
+				gpio_set_value_cansleep(
+					gpio_conf->cam_gpio_set_tbl[i].gpio,
+					gpio_conf->cam_gpio_set_tbl[i].flags);
+				usleep_range(gpio_conf->cam_gpio_set_tbl[i].delay,
+					     gpio_conf->cam_gpio_set_tbl[i].delay + 1000);
+			}
 			/* only config pwd pin in standby mode */
-            else
-            {
-                if(sinfo->sensor_pwd == gpio_conf->cam_gpio_set_tbl[i].gpio)
-                {
-                    gpio_set_value_cansleep(
-    				    gpio_conf->cam_gpio_set_tbl[i].gpio,
-    				    gpio_conf->cam_gpio_set_tbl[i].flags);
-    			    usleep_range(gpio_conf->cam_gpio_set_tbl[i].delay,
-    				    gpio_conf->cam_gpio_set_tbl[i].delay + 1000);
-                    break;
-                }
-            }
+			else
+			{
+				if(sinfo->sensor_pwd == gpio_conf->cam_gpio_set_tbl[i].gpio)
+				{
+					gpio_set_value_cansleep(
+						gpio_conf->cam_gpio_set_tbl[i].gpio,
+						gpio_conf->cam_gpio_set_tbl[i].flags);
+					usleep_range(gpio_conf->cam_gpio_set_tbl[i].delay,
+						     gpio_conf->cam_gpio_set_tbl[i].delay + 1000);
+					break;
+				}
+			}
 		}
 	} else {
 		/*here we can do gpio settings when  power down */
 		if (gpio_conf->cam_gpio_config_tbl_power_down) {
 			for (i = 0; i < gpio_conf->cam_gpio_config_tbl_power_down_size; i++) {
-                if((false == sinfo->standby_is_supported) || (0 == strcmp(sinfo->sensor_name, "")))
-                {
-    				gpio_set_value_cansleep(
-    					gpio_conf->cam_gpio_config_tbl_power_down[i].gpio,
-    					gpio_conf->cam_gpio_config_tbl_power_down[i].flags);
+				if((false == sinfo->standby_is_supported) || (0 == strcmp(sinfo->sensor_name, "")))
+				{
+					gpio_set_value_cansleep(
+						gpio_conf->cam_gpio_config_tbl_power_down[i].gpio,
+						gpio_conf->cam_gpio_config_tbl_power_down[i].flags);
 
-    					printk("%s: gpio = %d, value = %d\n", __func__,  
-    					gpio_conf->cam_gpio_config_tbl_power_down[i].gpio, 
-    					(unsigned)(gpio_conf->cam_gpio_config_tbl_power_down[i].flags));
-    					
-    					usleep_range(gpio_conf->cam_gpio_config_tbl_power_down[i].delay,
-    					gpio_conf->cam_gpio_config_tbl_power_down[i].delay + 1000);
-                }
-                else
-                {
-                    if(sinfo->sensor_pwd == gpio_conf->cam_gpio_config_tbl_power_down[i].gpio)
-                    {
-                        gpio_set_value_cansleep(
-    					    gpio_conf->cam_gpio_config_tbl_power_down[i].gpio,
-    					    gpio_conf->cam_gpio_config_tbl_power_down[i].flags);
-                        usleep_range(gpio_conf->cam_gpio_config_tbl_power_down[i].delay,
-    					    gpio_conf->cam_gpio_config_tbl_power_down[i].delay + 1000);
-                        break;
-                    }
-                }
+					printk("%s: gpio = %d, value = %d\n", __func__,
+					       gpio_conf->cam_gpio_config_tbl_power_down[i].gpio,
+					       (unsigned)(gpio_conf->cam_gpio_config_tbl_power_down[i].flags));
+
+					usleep_range(gpio_conf->cam_gpio_config_tbl_power_down[i].delay,
+						     gpio_conf->cam_gpio_config_tbl_power_down[i].delay + 1000);
+				}
+				else
+				{
+					if(sinfo->sensor_pwd == gpio_conf->cam_gpio_config_tbl_power_down[i].gpio)
+					{
+						gpio_set_value_cansleep(
+							gpio_conf->cam_gpio_config_tbl_power_down[i].gpio,
+							gpio_conf->cam_gpio_config_tbl_power_down[i].flags);
+						usleep_range(gpio_conf->cam_gpio_config_tbl_power_down[i].delay,
+							     gpio_conf->cam_gpio_config_tbl_power_down[i].delay + 1000);
+						break;
+					}
+				}
 			}
 		}
 		/* qualcomm modify, resume it */
-        else
-        {
-            for (i = gpio_conf->cam_gpio_set_tbl_size - 1; i >= 0; i--) {
-			if (gpio_conf->cam_gpio_set_tbl[i].flags)
+		else
+		{
+			for (i = gpio_conf->cam_gpio_set_tbl_size - 1; i >= 0; i--) {
 				gpio_set_value_cansleep(
 					gpio_conf->cam_gpio_set_tbl[i].gpio,
-					GPIOF_OUT_INIT_LOW);
-    		}
-        }
+					gpio_conf->cam_gpio_set_tbl[i].flags);
+			}
+		}
 	}
 	return rc;
 }

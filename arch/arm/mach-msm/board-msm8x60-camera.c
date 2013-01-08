@@ -361,16 +361,14 @@ static struct msm_bus_scale_pdata cam_bus_client_pdata = {
 static struct msm_camera_device_platform_data msm_camera_csi_device_data[] = {
 	{
 		.csid_core = 0,
-		.is_csic = 1,
 		.is_vpe    = 1,
 		.cam_bus_scale_table = &cam_bus_client_pdata,
 		.ioclk = {
-			.vfe_clk_rate =	228570000,
+			.vfe_clk_rate =	266667000,
 		},
 	},
 	{
 		.csid_core = 1,
-		.is_csic = 1,
 		.is_vpe    = 1,
 		.cam_bus_scale_table = &cam_bus_client_pdata,
 		.ioclk = {
